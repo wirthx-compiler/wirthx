@@ -102,6 +102,8 @@ llvm::Value *FunctionDefinitionNode::codegen(std::unique_ptr<Context> &context)
     {
         functionDefinition->setDSOLocal(true);
         functionDefinition->addFnAttr(llvm::Attribute::MustProgress);
+        if (!m_isProcedure && m_returnType->baseType == VariableBaseType::String)
+            functionDefinition->addFnAttr(llvm::Attribute::NoFree);
         llvm::AttrBuilder b(*context->TheContext);
         b.addAttribute("frame-pointer", "all");
         functionDefinition->addFnAttrs(b);
@@ -154,8 +156,7 @@ llvm::Value *FunctionDefinitionNode::codegen(std::unique_ptr<Context> &context)
         }
         if (!context->expliciteReturn)
         {
-            context->Builder->CreateRet(context->Builder->CreateLoad(
-                    context->NamedAllocations[m_name]->getAllocatedType(), context->NamedAllocations[m_name]));
+            context->Builder->CreateRet(context->Builder->CreateLoad(resultType, context->NamedAllocations[m_name]));
         }
 
         // Finish off the function.

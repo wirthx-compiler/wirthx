@@ -136,6 +136,13 @@ llvm::Value *FunctionCallNode::codegen(std::unique_ptr<Context> &context)
             return nullptr;
     }
 
+    llvm::AllocaInst *allocInst = nullptr;
+    auto returnType = functionDefinition.value()->returnType();
+    if (returnType && returnType->baseType == VariableBaseType::String)
+    {
+        allocInst = context->Builder->CreateAlloca(returnType->generateLlvmType(context));
+    }
+
     auto callInst = context->Builder->CreateCall(CalleeF, ArgsV);
     for (size_t i = 0, e = m_args.size(); i != e; ++i)
     {
@@ -154,6 +161,12 @@ llvm::Value *FunctionCallNode::codegen(std::unique_ptr<Context> &context)
                                    llvm::Attribute::getWithByValType(*context->TheContext, llvmArgType));
         }
     };
+
+    if (allocInst)
+    {
+        context->Builder->CreateStore(callInst, allocInst);
+        return allocInst;
+    }
     return callInst;
 }
 
