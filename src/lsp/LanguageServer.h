@@ -5,7 +5,7 @@
 #ifndef LANGUAGESERVER_H
 #define LANGUAGESERVER_H
 
-#include <llvm-18/llvm/ADT/StringRef.h>
+#include <llvm/ADT/StringRef.h>
 #include <map>
 #include <string>
 
