@@ -56,7 +56,7 @@ TEST_P(CompilerTest, TestNoError)
     options.rtlDirectories.emplace_back("rtl");
 
     options.runProgram = true;
-    options.buildMode = BuildMode::Release;
+    options.buildMode = BuildMode::Debug;
     options.outputDirectory = std::filesystem::current_path();
     compile_file(options, input_path, erstream, ostream);
 
@@ -246,7 +246,7 @@ INSTANTIATE_TEST_SUITE_P(CompilerTestNoError, CompilerTest,
                                          "forloop", "arraytest", "constantstest", "customint", "logicalcondition",
                                          "basicvec2", "dynarray", "externalfunction", "stringtest", "readfile",
                                          "repeatuntil", "stringcompare", "pointer_test", "rule110", "positive_assert",
-                                         "stringconv", "singletest", "doubletest", "exittest"));
+                                         "stringconv", "singletest", "doubletest", "exittest", "stringreturn"));
 
 INSTANTIATE_TEST_SUITE_P(CompilerTestWithError, CompilerTestError,
                          testing::Values("arrayaccess", "missing_return_type", "wrong_return_type", "parsing_errors"));
