@@ -35,32 +35,32 @@ SystemFunctionCallNode::SystemFunctionCallNode(const Token &token, std::string n
 {
 }
 
-llvm::Value *SystemFunctionCallNode::codegen_setlength(std::unique_ptr<Context> &context, ASTNode *parent)
+llvm::Value *SystemFunctionCallNode::codegen_setlength(std::unique_ptr<Context> &context, ASTNode *parent) const
 {
     assert(m_args.size() == 2 && "setlength needs 2 arguments");
-    auto array = m_args[0];
+    const auto array = m_args[0];
     auto newSize = m_args[1]->codegen(context);
     if (!newSize->getType()->isIntegerTy())
     {
         return nullptr;
     }
 
-    auto arrayType = array->resolveType(context->ProgramUnit, parent);
+    const auto arrayType = array->resolveType(context->ProgramUnit, parent);
     if (arrayType->baseType == VariableBaseType::Array)
     {
-        auto realType = std::dynamic_pointer_cast<ArrayType>(arrayType);
-        auto indexType = VariableType::getInteger(64)->generateLlvmType(context);
-        auto value = array->codegen(context);
-        auto arrayBaseType = realType->arrayBase->generateLlvmType(context);
-        auto llvmRecordType = realType->generateLlvmType(context);
+        const auto realType = std::dynamic_pointer_cast<ArrayType>(arrayType);
+        const auto indexType = VariableType::getInteger(64)->generateLlvmType(context);
+        const auto value = array->codegen(context);
+        const auto arrayBaseType = realType->arrayBase->generateLlvmType(context);
+        const auto llvmRecordType = realType->generateLlvmType(context);
 
 
         // auto ptrType = llvm::PointerType::getUnqual(arrayBaseType);
 
-        auto arraySizeOffset = context->Builder->CreateStructGEP(llvmRecordType, value, 0, "array.size.offset");
+        const auto arraySizeOffset = context->Builder->CreateStructGEP(llvmRecordType, value, 0, "array.size.offset");
 
 
-        auto arrayPointerOffset = context->Builder->CreateStructGEP(llvmRecordType, value, 1, "array.ptr.offset");
+        const auto arrayPointerOffset = context->Builder->CreateStructGEP(llvmRecordType, value, 1, "array.ptr.offset");
         // auto arrayPointer =
         //         context->Builder->CreateAlignedLoad(arrayBaseType, arrayPointerOffset, alignment, "array.ptr");
         if (64 != newSize->getType()->getIntegerBitWidth())
@@ -73,7 +73,7 @@ llvm::Value *SystemFunctionCallNode::codegen_setlength(std::unique_ptr<Context> 
 
         // allocate memory for pointer
 
-        auto allocSize = context->Builder->CreateMul(
+        const auto allocSize = context->Builder->CreateMul(
                 newSize, context->Builder->getInt64(arrayBaseType->getPrimitiveSizeInBits()));
         llvm::Value *allocCall =
                 context->Builder->CreateMalloc(indexType, //
@@ -83,7 +83,7 @@ llvm::Value *SystemFunctionCallNode::codegen_setlength(std::unique_ptr<Context> 
                 );
         const llvm::DataLayout &DL = context->TheModule->getDataLayout();
 
-        auto alignment = DL.getPrefTypeAlign(arrayBaseType);
+        const auto alignment = DL.getPrefTypeAlign(arrayBaseType);
 
         context->Builder->CreateMemSet(allocCall, //
                                        context->Builder->getInt8(0), // Number of elements
@@ -94,21 +94,19 @@ llvm::Value *SystemFunctionCallNode::codegen_setlength(std::unique_ptr<Context> 
     }
     if (arrayType->baseType == VariableBaseType::String)
     {
-        auto realType = std::dynamic_pointer_cast<StringType>(arrayType);
-        auto indexType = VariableType::getInteger(64)->generateLlvmType(context);
-        auto value = array->codegen(context);
+        const auto realType = std::dynamic_pointer_cast<StringType>(arrayType);
+        const auto indexType = VariableType::getInteger(64)->generateLlvmType(context);
+        const auto value = array->codegen(context);
         // const llvm::DataLayout &DL = context->TheModule->getDataLayout();
         // auto alignment = DL.getPrefTypeAlign(indexType);
-        auto arrayBaseType = IntegerType::getInteger(8)->generateLlvmType(context);
-        auto llvmRecordType = realType->generateLlvmType(context);
+        const auto arrayBaseType = IntegerType::getInteger(8)->generateLlvmType(context);
+        const auto llvmRecordType = realType->generateLlvmType(context);
 
 
-        // auto ptrType = llvm::PointerType::getUnqual(arrayBaseType);
-
-        auto arraySizeOffset = context->Builder->CreateStructGEP(llvmRecordType, value, 1, "array.size.offset");
+        const auto arraySizeOffset = context->Builder->CreateStructGEP(llvmRecordType, value, 1, "array.size.offset");
 
 
-        auto arrayPointerOffset = context->Builder->CreateStructGEP(llvmRecordType, value, 2, "array.ptr.offset");
+        const auto arrayPointerOffset = context->Builder->CreateStructGEP(llvmRecordType, value, 2, "array.ptr.offset");
         // auto arrayPointer =
         //         context->Builder->CreateAlignedLoad(arrayBaseType, arrayPointerOffset, alignment, "array.ptr");
         if (64 != newSize->getType()->getIntegerBitWidth())
@@ -121,7 +119,7 @@ llvm::Value *SystemFunctionCallNode::codegen_setlength(std::unique_ptr<Context> 
 
         // allocate memory for pointer
 
-        auto allocSize = context->Builder->CreateMul(
+        const auto allocSize = context->Builder->CreateMul(
                 newSize, context->Builder->getInt64(arrayBaseType->getPrimitiveSizeInBits()));
         // auto allocCall = context->Builder->CreateCall(context->TheModule->getFunction("malloc"), allocSize);
         llvm::Value *allocCall =
@@ -145,20 +143,20 @@ llvm::Value *SystemFunctionCallNode::codegen_length(std::unique_ptr<Context> &co
     }
     return nullptr;
 }
-llvm::Value *SystemFunctionCallNode::find_target_fileout(std::unique_ptr<Context> &context, ASTNode *parent)
+llvm::Value *SystemFunctionCallNode::find_target_fileout(std::unique_ptr<Context> &context, ASTNode *parent) const
 {
     llvm::Value *loadedStdOut = context->Builder->CreateLoad(llvm::PointerType::getUnqual(*context->TheContext),
                                                              context->NamedValues["stdout"]);
 
-    for (auto &arg: m_args)
+    for (const auto &arg: m_args)
     {
         auto type = arg->resolveType(context->ProgramUnit, parent);
-        if (auto fileType = std::dynamic_pointer_cast<FileType>(type))
+        if (const auto fileType = std::dynamic_pointer_cast<FileType>(type))
         {
-            auto llvmFileType = fileType->generateLlvmType(context);
-            auto argValue = arg->codegen(context);
+            const auto llvmFileType = fileType->generateLlvmType(context);
+            const auto argValue = arg->codegen(context);
 
-            auto filePtr = context->Builder->CreateStructGEP(llvmFileType, argValue, 1, "file.ptr");
+            const auto filePtr = context->Builder->CreateStructGEP(llvmFileType, argValue, 1, "file.ptr");
 
             loadedStdOut = context->Builder->CreateLoad(llvm::PointerType::getUnqual(*context->TheContext), filePtr);
             loadedStdOut =
@@ -167,21 +165,21 @@ llvm::Value *SystemFunctionCallNode::find_target_fileout(std::unique_ptr<Context
     }
     return loadedStdOut;
 }
-llvm::Value *SystemFunctionCallNode::codegen_write(std::unique_ptr<Context> &context, ASTNode *parent)
+llvm::Value *SystemFunctionCallNode::codegen_write(std::unique_ptr<Context> &context, ASTNode *parent) const
 {
     llvm::Function *fprintf = context->TheModule->getFunction("fprintf");
 
     llvm::Value *loadedStdOut = find_target_fileout(context, parent);
     if (!fprintf)
         LogErrorV("the function fprintf was not found");
-    for (auto &arg: m_args)
+    for (const auto &arg: m_args)
     {
         auto type = arg->resolveType(context->ProgramUnit, parent);
         auto argValue = arg->codegen(context);
 
         std::vector<llvm::Value *> ArgsV;
         ArgsV.push_back(loadedStdOut);
-        if (auto integerType = std::dynamic_pointer_cast<IntegerType>(type))
+        if (const auto integerType = std::dynamic_pointer_cast<IntegerType>(type))
         {
             if (context->TargetTriple->getOS() == llvm::Triple::Win32)
             {
@@ -238,7 +236,7 @@ llvm::Value *SystemFunctionCallNode::codegen_write(std::unique_ptr<Context> &con
     }
     return nullptr;
 }
-llvm::Value *SystemFunctionCallNode::codegen_writeln(std::unique_ptr<Context> &context, ASTNode *parent)
+llvm::Value *SystemFunctionCallNode::codegen_writeln(std::unique_ptr<Context> &context, ASTNode *parent) const
 {
     codegen_write(context, parent);
 
@@ -287,7 +285,7 @@ llvm::Value *SystemFunctionCallNode::codegen_assert(std::unique_ptr<Context> &co
             {
                 const auto assertCall = ctx->TheModule->getFunction(assertFunction);
                 std::vector<llvm::Value *> ArgsV;
-                auto token = argument->expressionToken();
+                const auto token = argument->expressionToken();
                 ArgsV.push_back(ctx->Builder->CreateGlobalString(assertation, "assertion"));
                 ArgsV.push_back(
                         ctx->Builder->CreateGlobalString(token.sourceLocation.filename, "assertion_source_file"));
@@ -311,8 +309,8 @@ llvm::Value *SystemFunctionCallNode::codegen(std::unique_ptr<Context> &context)
     ASTNode *parent = context->ProgramUnit.get();
     if (context->TopLevelFunction)
     {
-        auto def = context->ProgramUnit->getFunctionDefinition(std::string(context->TopLevelFunction->getName()));
-        if (def)
+        if (const auto def =
+                    context->ProgramUnit->getFunctionDefinition(std::string(context->TopLevelFunction->getName())))
         {
             parent = def.value().get();
         }
@@ -321,8 +319,8 @@ llvm::Value *SystemFunctionCallNode::codegen(std::unique_ptr<Context> &context)
     if (iequals(m_name, "low"))
     {
 
-        auto paramType = m_args[0]->resolveType(context->ProgramUnit, parent);
-        if (auto arrayType = std::dynamic_pointer_cast<ArrayType>(paramType))
+        const auto paramType = m_args[0]->resolveType(context->ProgramUnit, parent);
+        if (const auto arrayType = std::dynamic_pointer_cast<ArrayType>(paramType))
         {
             if (arrayType->isDynArray)
             {
@@ -338,8 +336,8 @@ llvm::Value *SystemFunctionCallNode::codegen(std::unique_ptr<Context> &context)
     }
     else if (iequals(m_name, "high"))
     {
-        auto paramType = m_args[0]->resolveType(context->ProgramUnit, parent);
-        if (auto arrayType = std::dynamic_pointer_cast<ArrayType>(paramType))
+        const auto paramType = m_args[0]->resolveType(context->ProgramUnit, parent);
+        if (const auto arrayType = std::dynamic_pointer_cast<ArrayType>(paramType))
         {
             if (arrayType->isDynArray)
             {
@@ -371,8 +369,8 @@ llvm::Value *SystemFunctionCallNode::codegen(std::unique_ptr<Context> &context)
     }
     else if (iequals(m_name, "pchar"))
     {
-        auto stringStructPtr = m_args[0]->codegen(context);
-        auto type = m_args[0]->resolveType(context->ProgramUnit, parent);
+        const auto stringStructPtr = m_args[0]->codegen(context);
+        const auto type = m_args[0]->resolveType(context->ProgramUnit, parent);
         const auto arrayPointerOffset = context->Builder->CreateStructGEP(type->generateLlvmType(context),
                                                                           stringStructPtr, 2, "string.ptr.offset");
         return context->Builder->CreateLoad(llvm::PointerType::getUnqual(*context->TheContext), arrayPointerOffset);
@@ -383,10 +381,22 @@ llvm::Value *SystemFunctionCallNode::codegen(std::unique_ptr<Context> &context)
     }
     else if (iequals(m_name, "halt"))
     {
-        auto argValue = m_args[0]->codegen(context);
+        const auto argValue = m_args[0]->codegen(context);
         llvm::Function *CalleeF = context->TheModule->getFunction("exit");
 
         return context->Builder->CreateCall(CalleeF, argValue);
+    }
+    else if (iequals(m_name, "exit"))
+    {
+        context->expliciteReturn = true;
+        context->BreakBlock.BlockUsed = true;
+        if (m_args.empty())
+        {
+            return context->Builder->CreateRetVoid();
+        }
+        const auto argValue = m_args[0]->codegen(context);
+
+        return context->Builder->CreateRet(argValue);
     }
     else if (iequals(m_name, "assert"))
     {

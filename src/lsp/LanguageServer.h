@@ -5,9 +5,12 @@
 #ifndef LANGUAGESERVER_H
 #define LANGUAGESERVER_H
 
+#include <llvm/ADT/StringRef.h>
 #include <map>
 #include <string>
+
 #include "compiler/CompilerOptions.h"
+#include "exceptions/CompilerException.h"
 struct LspDocument
 {
     std::string uri;
@@ -21,6 +24,7 @@ class LanguageServer
 
 public:
     explicit LanguageServer(CompilerOptions options);
+
 
     void handleRequest();
 };

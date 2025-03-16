@@ -1,3 +1,6 @@
+{
+    Null-terminated string (PChar) routines.
+}
 unit strings;
 
 interface
@@ -19,6 +22,10 @@ interface
       S2: string
     ):Integer;
 
+    {
+        returns the length of the given pointer to a character
+        @param(str null terminated string)
+    }
     function strlen(str :  pchar) : int64; external 'c' name 'strlen';
 
 implementation

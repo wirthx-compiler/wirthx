@@ -56,7 +56,7 @@ permalink: /docs/<xsl:value-of select="$name" />/
 
 | Name | Description |
 | ------ | ------ |
-<xsl:for-each select="param">| <xsl:value-of select="@name" /> | <xsl:value-of select="@text" /> |
+<xsl:for-each select="param">| <xsl:value-of select="@name" /> | <xsl:value-of select="text()" /> |
 </xsl:for-each>
 </xsl:if>
 
@@ -72,7 +72,7 @@ permalink: /docs/<xsl:value-of select="$name" />/
 
 | Name | Description |
 | ------ | ------ |
-<xsl:for-each select="param">| <xsl:value-of select="@name" /> | <xsl:value-of select="@text" /> |
+<xsl:for-each select="param">| <xsl:value-of select="@name" /> | <xsl:value-of select="text()" /> |
 </xsl:for-each>
 </xsl:if>
 

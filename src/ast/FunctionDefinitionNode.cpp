@@ -137,6 +137,7 @@ llvm::Value *FunctionDefinitionNode::codegen(std::unique_ptr<Context> &context)
     context->TopLevelFunction = functionDefinition;
     if (m_body)
     {
+        context->expliciteReturn = false;
         m_body->setBlockName(m_name + "_block");
         m_body->codegen(context);
         if (m_isProcedure)
@@ -151,9 +152,11 @@ llvm::Value *FunctionDefinitionNode::codegen(std::unique_ptr<Context> &context)
 
             return functionDefinition;
         }
-
-        context->Builder->CreateRet(context->Builder->CreateLoad(context->NamedAllocations[m_name]->getAllocatedType(),
-                                                                 context->NamedAllocations[m_name]));
+        if (!context->expliciteReturn)
+        {
+            context->Builder->CreateRet(context->Builder->CreateLoad(
+                    context->NamedAllocations[m_name]->getAllocatedType(), context->NamedAllocations[m_name]));
+        }
 
         // Finish off the function.
 
