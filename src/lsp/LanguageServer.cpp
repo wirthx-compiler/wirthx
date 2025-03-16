@@ -3,6 +3,8 @@
 //
 
 #include "LanguageServer.h"
+
+#include <future>
 #include <llvm/Support/CommandLine.h>
 #include <llvm/Support/Endian.h>
 
@@ -56,7 +58,7 @@ void sendLogMessage(const std::vector<std::string> &messages)
     {
         llvm::json::Object logMessage;
         logMessage["message"] = message;
-        logMessage["type"] = 1;
+        logMessage["type"] = 2;
         logMessages.push_back(std::move(logMessage));
     }
     llvm::json::Object response;
@@ -68,7 +70,7 @@ void sendLogMessage(const std::vector<std::string> &messages)
 
     llvm::raw_string_ostream sstream(resultString);
     sstream << resultValue;
-    std::cerr << "TEST: " << sstream.str() << "\n";
+    // std::cerr << "TEST: " << sstream.str() << "\n";
     std::cout << "Content-Length: " << sstream.str().length() << "\r\n\r\n";
     std::cout << sstream.str();
 }
@@ -86,17 +88,13 @@ constexpr int mapOutputTypeToSeverity(const OutputType output)
     }
     return 0;
 }
-void sentDiagnostics(std::vector<ParserError> &errors)
+void sentDiagnostics(std::map<std::string, std::vector<ParserError>> errorsMap)
 {
-    if (errors.empty())
+    if (errorsMap.empty())
         return;
 
     // group messages by file
-    std::map<std::string, std::vector<ParserError>> errorsMap;
-    for (auto &error: errors)
-    {
-        errorsMap[error.token.sourceLocation.filename].push_back(error);
-    }
+
 
     for (auto &[fileName, messsages]: errorsMap)
     {
@@ -148,14 +146,39 @@ void sentDiagnostics(std::vector<ParserError> &errors)
     }
 }
 
+void parseAndSendDiagnostics(std::vector<std::filesystem::path> rtlDirectories, llvm::StringRef uri,
+                             llvm::StringRef text)
+{
+    std::map<std::string, std::vector<ParserError>> errorsMap;
+    Lexer lexer;
+    auto tokens = lexer.tokenize(uri.str(), text.str());
+    std::filesystem::path filePath = uri.str();
+    std::unordered_map<std::string, bool> definitions;
+    MacroParser macro_parser(definitions);
+    Parser parser(rtlDirectories, filePath, definitions, macro_parser.parseFile(tokens));
+    auto ast = parser.parseFile();
+    if (!parser.hasMessages())
+    {
+        errorsMap[filePath.string()] = {};
+    }
+    else
+    {
+        for (auto &error: parser.getErrors())
+        {
+            errorsMap[error.token.sourceLocation.filename].push_back(error);
+        }
+    }
+    sentDiagnostics(errorsMap);
+}
 void LanguageServer::handleRequest()
 {
     std::vector<std::string> logMessages;
-    std::vector<ParserError> errors;
+    std::map<std::string, std::vector<ParserError>> errorsMap;
+
     while (true)
     {
         logMessages.clear();
-        errors.clear();
+
 
         std::string commandString;
         getline(std::cin, commandString);
@@ -175,148 +198,144 @@ void LanguageServer::handleRequest()
         }
         else
         {
-            std::cerr << "command: " << commandString << std::endl;
+            // std::cerr << "command: " << commandString << std::endl;
         }
 
         auto requestObject = request.get().getAsObject();
         if (auto method = requestObject->getString("method"))
         {
-            std::string resultString;
+            try
+            {
+                std::string resultString;
 
-            logMessages.push_back("method: " + method.value().str());
-            llvm::raw_string_ostream sstream(resultString);
-            llvm::json::Object response;
-            response["jsonrpc"] = "2.0";
-            bool hasId = false;
-            if (requestObject->getInteger("id").has_value())
-            {
-                response["id"] = requestObject->getInteger("id").value();
-                hasId = true;
-            }
-            else if (requestObject->getString("id").has_value())
-            {
-                response["id"] = requestObject->getString("id").value();
-                hasId = true;
-            }
-            llvm::json::Object result;
-            if (method.value() == "shutdown")
-            {
-                // sendNotification("exit");
-                break;
-            }
-            if (method.value() == "initialize")
-            {
-                llvm::json::Object capabilities;
-                capabilities["documentHighlightProvider"] = false;
-                capabilities["documentSymbolProvider"] = true;
-                capabilities["colorProvider"] = true;
-                llvm::json::Object diagnosticProvider;
-                diagnosticProvider["interFileDependencies"] = true;
-                diagnosticProvider["workspaceDiagnostics"] = true;
-                capabilities["diagnosticProvider"] = std::move(diagnosticProvider);
-                llvm::json::Object textDocumentSync;
-                textDocumentSync["openClose"] = true;
-                textDocumentSync["change"] = 1;
-                capabilities["textDocumentSync"] = std::move(textDocumentSync);
-                result["capabilities"] = std::move(capabilities);
-                llvm::json::Object serverInfo;
-                serverInfo["name"] = "wirthx";
-                serverInfo["version"] = "0.1";
-                result["serverInfo"] = std::move(serverInfo);
-                response["result"] = std::move(result);
-            }
-            else if (method.value() == "initialized")
-            {
-                response["result"] = std::move(result);
-                continue;
-            }
-            else if (method.value() == "textDocument/didOpen")
-            {
-                auto params = requestObject->getObject("params");
-                auto uri = params->getObject("textDocument")->getString("uri");
-
-                auto text = params->getObject("textDocument")->getString("text");
-                m_openDocuments[uri.value().str()] = LspDocument{.uri = uri.value().str(), .text = text.value().str()};
-                response["result"] = std::move(result);
-                Lexer lexer;
-                auto tokens = lexer.tokenize(uri.value().str(), text.value().str());
-                std::filesystem::path filePath = uri.value().str();
-                std::unordered_map<std::string, bool> definitions;
-                MacroParser macro_parser(definitions);
-                Parser parser(m_options.rtlDirectories, filePath, definitions, macro_parser.parseFile(tokens));
-                auto ast = parser.parseFile();
-                for (auto error: parser.getErrors())
+                logMessages.push_back("method: " + method.value().str());
+                llvm::raw_string_ostream sstream(resultString);
+                llvm::json::Object response;
+                response["jsonrpc"] = "2.0";
+                bool hasId = false;
+                if (requestObject->getInteger("id").has_value())
                 {
-                    errors.emplace_back(error);
+                    response["id"] = requestObject->getInteger("id").value();
+                    hasId = true;
+                }
+                else if (requestObject->getString("id").has_value())
+                {
+                    response["id"] = requestObject->getString("id").value();
+                    hasId = true;
+                }
+                llvm::json::Object result;
+                if (method.value() == "shutdown")
+                {
+                    // sendNotification("exit");
+                    return;
+                }
+                if (method.value() == "initialize")
+                {
+                    llvm::json::Object capabilities;
+                    capabilities["documentHighlightProvider"] = false;
+                    capabilities["documentSymbolProvider"] = true;
+                    capabilities["colorProvider"] = false;
+                    llvm::json::Object diagnosticProvider;
+                    diagnosticProvider["interFileDependencies"] = true;
+                    diagnosticProvider["workspaceDiagnostics"] = true;
+                    capabilities["diagnosticProvider"] = std::move(diagnosticProvider);
+                    llvm::json::Object textDocumentSync;
+                    textDocumentSync["openClose"] = true;
+                    textDocumentSync["change"] = 1;
+                    capabilities["textDocumentSync"] = std::move(textDocumentSync);
+                    result["capabilities"] = std::move(capabilities);
+                    llvm::json::Object serverInfo;
+                    serverInfo["name"] = "wirthx";
+                    serverInfo["version"] = "0.1";
+                    result["serverInfo"] = std::move(serverInfo);
+                    response["result"] = std::move(result);
+                }
+                else if (method.value() == "workspace/didChangeConfiguration")
+                {
+                    std::cerr << "command: " << commandString << std::endl;
+                }
+                else if (method.value() == "initialized")
+                {
+                    response["result"] = std::move(result);
+                    continue;
+                }
+                else if (method.value() == "textDocument/didOpen")
+                {
+                    auto params = requestObject->getObject("params");
+                    auto uri = params->getObject("textDocument")->getString("uri");
+
+                    auto text = params->getObject("textDocument")->getString("text");
+                    m_openDocuments[uri.value().str()] =
+                            LspDocument{.uri = uri.value().str(), .text = text.value().str()};
+                    response["result"] = std::move(result);
+                    std::ignore = std::async(std::launch::async, [rtlDirectories = this->m_options.rtlDirectories,
+                                                                  uri = uri.value(), text = text.value()]()
+                                             { parseAndSendDiagnostics(rtlDirectories, uri, text); });
+                }
+                else if (method.value() == "textDocument/didClose")
+                {
+                    auto params = requestObject->getObject("params");
+                    auto uri = params->getObject("textDocument")->getString("uri");
+                    m_openDocuments.erase(uri.value().str());
+                }
+                else if (method.value() == "textDocument/didChange")
+                {
+                    auto params = requestObject->getObject("params");
+                    auto uri = params->getObject("textDocument")->getString("uri");
+
+                    auto text = params->getArray("contentChanges")->front().getAsObject()->getString("text");
+                    m_openDocuments[uri.value().str()] =
+                            LspDocument{.uri = uri.value().str(), .text = text.value().str()};
+                    response["result"] = std::move(result);
+                    std::ignore = std::async(std::launch::async, [rtlDirectories = this->m_options.rtlDirectories,
+                                                                  uri = uri.value(), text = text.value()]()
+                                             { parseAndSendDiagnostics(rtlDirectories, uri, text); });
+                }
+                else if (method.value() == "textDocument/documentHighlight")
+                {
+                    std::cerr << " command: " << commandString << "\n";
+
+                    auto params = requestObject->getObject("params");
+                    auto uri = params->getObject("textDocument")->getString("uri");
+                    auto &document = m_openDocuments.at(uri.value().str());
+                    Lexer lexer;
+                    auto tokens = lexer.tokenize(uri.value().str(), document.text);
+                    llvm::json::Array array;
+
+
+                    response["result"] = std::move(array);
+                }
+                else if (method.value() == "textDocument/documentColor")
+                {
+                    auto params = requestObject->getObject("params");
+                    auto uri = params->getObject("textDocument")->getString("uri");
+                    auto &document = m_openDocuments.at(uri.value().str());
+                    Lexer lexer;
+                    auto tokens = lexer.tokenize(uri.value().str(), document.text);
+                    llvm::json::Array array;
+
+                    response["result"] = std::move(array);
+                }
+                else
+                {
+                    std::cerr << "unsupported method: " << method.value().str() << "\n";
+                    logMessages.push_back("unsupported method: " + method.value().str());
+                    continue;
+                }
+
+                if (hasId)
+                {
+                    llvm::json::Value resultValue(std::move(response));
+                    sstream << resultValue;
+                    std::cout << "Content-Length: " << sstream.str().length() << "\r\n\r\n";
+                    std::cout << sstream.str();
+                    std::cerr << sstream.str();
                 }
             }
-            else if (method.value() == "textDocument/didClose")
-            {
-                auto params = requestObject->getObject("params");
-                auto uri = params->getObject("textDocument")->getString("uri");
-                m_openDocuments.erase(uri.value().str());
-            }
-            else if (method.value() == "textDocument/didChange")
-            {
-                auto params = requestObject->getObject("params");
-                auto uri = params->getObject("textDocument")->getString("uri");
-
-                auto text = params->getArray("contentChanges")->front().getAsObject()->getString("text");
-                m_openDocuments[uri.value().str()] = LspDocument{.uri = uri.value().str(), .text = text.value().str()};
-                response["result"] = std::move(result);
-                Lexer lexer;
-                auto tokens = lexer.tokenize(uri.value().str(), text.value().str());
-                std::filesystem::path filePath = uri.value().str();
-
-                std::unordered_map<std::string, bool> definitions;
-                MacroParser macro_parser(definitions);
-
-                Parser parser(m_options.rtlDirectories, filePath, definitions, macro_parser.parseFile(tokens));
-                auto ast = parser.parseFile();
-                for (auto &error: parser.getErrors())
-                {
-                    errors.emplace_back(error);
-                }
-            }
-            else if (method.value() == "textDocument/documentHighlight")
+            catch (...)
             {
                 std::cerr << " command: " << commandString << "\n";
-
-                auto params = requestObject->getObject("params");
-                auto uri = params->getObject("textDocument")->getString("uri");
-                auto &document = m_openDocuments.at(uri.value().str());
-                Lexer lexer;
-                auto tokens = lexer.tokenize(uri.value().str(), document.text);
-                llvm::json::Array array;
-
-
-                response["result"] = std::move(array);
-            }
-            else if (method.value() == "textDocument/documentColor")
-            {
-                auto params = requestObject->getObject("params");
-                auto uri = params->getObject("textDocument")->getString("uri");
-                auto &document = m_openDocuments.at(uri.value().str());
-                Lexer lexer;
-                auto tokens = lexer.tokenize(uri.value().str(), document.text);
-                llvm::json::Array array;
-
-                response["result"] = std::move(array);
-            }
-            else
-            {
-                std::cerr << "unsupported method: " << method.value().str() << "\n";
-                logMessages.push_back("unsupported method: " + method.value().str());
-                continue;
-            }
-
-            if (hasId)
-            {
-                llvm::json::Value resultValue(std::move(response));
-                sstream << resultValue;
-                std::cout << "Content-Length: " << sstream.str().length() << "\r\n\r\n";
-                std::cout << sstream.str();
-                std::cerr << sstream.str();
+                std::cerr << "unexpected error happend\n";
             }
         }
         else
@@ -325,6 +344,5 @@ void LanguageServer::handleRequest()
         }
 
         sendLogMessage(logMessages);
-        sentDiagnostics(errors);
     }
 }

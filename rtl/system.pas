@@ -13,11 +13,26 @@ interface
      Releases the given memory
     }
     procedure freemem(var F: PChar);
+    {
+        assignes the filename to the file F
+        @param(F file to be asssigned)
+        @param(FileName name of the file)
+    }
     procedure AssignFile(var F: File;FileName: String); external;
     procedure CloseFile(var F: File); external;
     Procedure inc(var value: integer);
     Procedure inc(var value: int64);
+
+    {
+        decreases the value by one
+        @param(value to be decreased)
+    }
     Procedure dec(var value: integer);
+
+    {
+        decreases the value by one
+        @param(value to be decreased)
+    }
     Procedure dec(var value: int64);
     {
         opens the file for reading

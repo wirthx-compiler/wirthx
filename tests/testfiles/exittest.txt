@@ -1,0 +1,6 @@
+11 is greater then 10
+9 is not greater then 10
+Test 1: 20.000000
+Test 2: 0.000000
+test is 12
+test is not 12
