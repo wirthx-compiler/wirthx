@@ -16,9 +16,9 @@
 #include "types/StringType.h"
 
 
-static std::vector<std::string> knownSystemCalls = {"writeln",    "write",  "printf",    "exit",  "low",    "high",
-                                                    "setlength",  "length", "pchar",     "new",   "halt",   "assert",
-                                                    "assignfile", "readln", "closefile", "reset", "rewrite"};
+static std::vector<std::string> knownSystemCalls = {"writeln",    "write",  "printf",    "exit",  "low",     "high",
+                                                    "setlength",  "length", "pchar",     "new",   "halt",    "assert",
+                                                    "assignfile", "readln", "closefile", "reset", "rewrite", "ord"};
 
 bool isKnownSystemCall(const std::string &name)
 {
@@ -412,6 +412,12 @@ llvm::Value *SystemFunctionCallNode::codegen(std::unique_ptr<Context> &context)
         return codegen_assert(context, parent, m_args[0].get(), m_args[0]->codegen(context),
                               m_args[0]->expressionToken().lexical());
     }
+    else if (iequals(m_name, "ord"))
+    {
+        const auto argValue = m_args[0]->codegen(context);
+        return argValue;
+    }
+
     return FunctionCallNode::codegen(context);
 }
 
@@ -438,6 +444,10 @@ std::shared_ptr<VariableType> SystemFunctionCallNode::resolveType(const std::uni
     if (iequals(m_name, "pchar"))
     {
         return PointerType::getPointerTo(IntegerType::getInteger(8));
+    }
+    if (iequals(m_name, "ord"))
+    {
+        return IntegerType::getInteger(32);
     }
 
     return nullptr;

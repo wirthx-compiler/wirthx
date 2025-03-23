@@ -14,6 +14,7 @@ begin
     begin
         color := GREEN;
         writeln('color = GREEN');
+        writeln('ord(color) = ',ord(color));
     end;
     writeln('low(color) = ',low(color));
     writeln('high(color) = ',high(color));
