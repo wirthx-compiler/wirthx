@@ -1,13 +1,6 @@
-//
-// Created by stefan on 23.03.25.
-//
-
-#ifndef ENUMTYPE_H
-#define ENUMTYPE_H
+#pragma once
 
 #include <map>
-
-
 #include "RangeType.h"
 #include "VariableType.h"
 
@@ -32,6 +25,3 @@ public:
 
     llvm::Type *generateLlvmType(std::unique_ptr<Context> &context) override;
 };
-
-
-#endif // ENUMTYPE_H

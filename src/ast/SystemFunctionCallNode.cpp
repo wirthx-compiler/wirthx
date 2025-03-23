@@ -12,6 +12,7 @@
 #include "UnitNode.h"
 #include "compiler/Context.h"
 #include "types/FileType.h"
+#include "types/RangeType.h"
 #include "types/StringType.h"
 
 
@@ -333,6 +334,10 @@ llvm::Value *SystemFunctionCallNode::codegen(std::unique_ptr<Context> &context)
         {
             return context->Builder->getInt64(0);
         }
+        if (const auto range = std::dynamic_pointer_cast<RangeType>(paramType))
+        {
+            return context->Builder->getInt64(range->lowerBounds());
+        }
     }
     else if (iequals(m_name, "high"))
     {
@@ -348,6 +353,10 @@ llvm::Value *SystemFunctionCallNode::codegen(std::unique_ptr<Context> &context)
         if (const auto stringType = std::dynamic_pointer_cast<StringType>(paramType))
         {
             return context->Builder->CreateSub(codegen_length(context, parent), context->Builder->getInt64(1));
+        }
+        if (const auto range = std::dynamic_pointer_cast<RangeType>(paramType))
+        {
+            return context->Builder->getInt64(range->upperBounds());
         }
     }
     else if (iequals(m_name, "length"))

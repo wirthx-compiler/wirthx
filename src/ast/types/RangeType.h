@@ -11,8 +11,6 @@ class RangeType
 {
 public:
     virtual ~RangeType() = default;
-
-private:
     virtual int64_t lowerBounds() = 0;
     virtual int64_t upperBounds() = 0;
 };

@@ -255,7 +255,7 @@ void Parser::parseTypeDefinitions(const size_t scope)
             auto enumType = EnumType::getEnum(typeName);
 
             std::vector<Token> namedTokens;
-            int64_t startValue = 1;
+            int64_t startValue = 0;
             while (canConsume(TokenType::NAMEDTOKEN))
             {
                 next();

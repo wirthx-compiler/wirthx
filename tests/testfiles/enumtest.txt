@@ -1,1 +1,3 @@
 color = GREEN
+low(color) = 0
+high(color) = 2
