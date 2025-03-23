@@ -16,6 +16,7 @@
 #include "ast/CharConstantNode.h"
 #include "ast/ComparissionNode.h"
 #include "ast/DoubleNode.h"
+#include "ast/EnumAccessNode.h"
 #include "ast/FieldAccessNode.h"
 #include "ast/FieldAssignmentNode.h"
 #include "ast/ForNode.h"
@@ -29,6 +30,7 @@
 #include "ast/VariableAccessNode.h"
 #include "ast/VariableAssignmentNode.h"
 #include "ast/WhileNode.h"
+#include "ast/types/EnumType.h"
 #include "ast/types/FileType.h"
 #include "ast/types/RecordType.h"
 #include "ast/types/StringType.h"
@@ -248,6 +250,31 @@ void Parser::parseTypeDefinitions(const size_t scope)
 
             consume(TokenType::SEMICOLON);
         }
+        else if (tryConsume(TokenType::LEFT_CURLY))
+        {
+            auto enumType = EnumType::getEnum(typeName);
+
+            std::vector<Token> namedTokens;
+            int64_t startValue = 1;
+            while (canConsume(TokenType::NAMEDTOKEN))
+            {
+                next();
+                namedTokens.emplace_back(current());
+                enumType->addEnumValue(current().lexical(), startValue);
+                if (tryConsume(TokenType::EQUAL))
+                {
+                    const auto number = std::dynamic_pointer_cast<NumberNode>(parseNumber());
+                    startValue = number->getValue();
+                }
+                tryConsume(TokenType::COMMA);
+
+                startValue++;
+            }
+            consume(TokenType::RIGHT_CURLY);
+            consume(TokenType::SEMICOLON);
+
+            m_typeDefinitions.emplace(typeName, enumType);
+        }
     }
 }
 std::shared_ptr<ArrayType> Parser::parseArray(size_t scope)
@@ -435,7 +462,7 @@ std::vector<VariableDefinition> Parser::parseVariableDefinitions(const size_t sc
     else if (tryConsume(TokenType::EQUAL))
     {
         value = parseToken(scope);
-
+        assert(value && "value for an variable initialization with assignment can not be null");
         // determin the type from the parsed token
         if (!type)
         {
@@ -754,6 +781,18 @@ std::shared_ptr<ASTNode> Parser::parseVariableAssignment(size_t scope)
         return std::make_shared<ArrayAssignmentNode>(variableNameToken, index, expression);
     }
 }
+std::optional<std::shared_ptr<EnumType>> Parser::tryGetEnumTypeByValue(const std::string &enumKey) const
+{
+    for (const auto &[typeName, type]: m_typeDefinitions)
+    {
+        if (auto enumType = std::dynamic_pointer_cast<EnumType>(type))
+        {
+            if (enumType->hasEnumKey(enumKey))
+                return enumType;
+        }
+    }
+    return std::nullopt;
+}
 std::shared_ptr<ASTNode> Parser::parseVariableAccess(const size_t scope)
 {
     consume(TokenType::NAMEDTOKEN);
@@ -789,6 +828,10 @@ std::shared_ptr<ASTNode> Parser::parseVariableAccess(const size_t scope)
         return std::make_shared<FieldAccessNode>(token, field);
     }
 
+    if (auto enumType = tryGetEnumTypeByValue(token.lexical()))
+    {
+        return std::make_shared<EnumAccessNode>(token, enumType.value());
+    }
     if (!isVariableDefined(token.lexical(), scope))
     {
         m_errors.push_back(ParserError{
@@ -834,6 +877,7 @@ std::shared_ptr<ASTNode> Parser::parseToken(const size_t scope)
         {
             return parseFunctionCall(scope);
         }
+
 
         return parseVariableAccess(scope);
     }

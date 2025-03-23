@@ -119,6 +119,15 @@ llvm::AllocaInst *VariableDefinition::generateCode(std::unique_ptr<Context> &con
                 return allocatedFile;
             }
         }
+        case VariableBaseType::Enum:
+        {
+            auto type = this->variableType->generateLlvmType(context);
+            auto allocation = context->Builder->CreateAlloca(type, nullptr, this->variableName);
+            // if (!this->value)
+            context->Builder->CreateStore(
+                    context->Builder->getIntN(allocation->getAllocatedType()->getIntegerBitWidth(), 0), allocation);
+            return allocation;
+        }
         default:
             assert(false && "unsupported variable base type to generate variable definition");
             return nullptr;

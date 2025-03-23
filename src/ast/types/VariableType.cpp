@@ -22,6 +22,7 @@ bool VariableType::isSimpleType() const
         case VariableBaseType::Float:
         case VariableBaseType::Double:
         case VariableBaseType::Boolean:
+        case VariableBaseType::Enum:
             return true;
         default:
             assert(false && "unknown base type to generate llvm type for");
