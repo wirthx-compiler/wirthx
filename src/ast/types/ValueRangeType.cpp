@@ -5,7 +5,7 @@
 #include "ValueRangeType.h"
 
 #include <cmath>
-#include <llvm-18/llvm/IR/IRBuilder.h>
+#include <llvm/IR/IRBuilder.h>
 
 #include "compiler/Context.h"
 ValueRangeType::ValueRangeType(const std::string &name, int64_t startValue, int64_t endValue) :
