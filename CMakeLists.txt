@@ -77,6 +77,7 @@ file(GLOB SRC
         src/ast/types/FileType.cpp
         src/ast/types/RangeType.cpp
         src/ast/types/EnumType.cpp
+        src/ast/types/ValueRangeType.cpp
         src/ast/ForNode.cpp
         src/ast/RepeatUntilNode.cpp
         src/ast/BreakNode.cpp

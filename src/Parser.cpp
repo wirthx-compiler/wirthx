@@ -34,6 +34,7 @@
 #include "ast/types/FileType.h"
 #include "ast/types/RecordType.h"
 #include "ast/types/StringType.h"
+#include "ast/types/ValueRangeType.h"
 #include "compare.h"
 #include "magic_enum/magic_enum.hpp"
 
@@ -254,26 +255,35 @@ void Parser::parseTypeDefinitions(const size_t scope)
         {
             auto enumType = EnumType::getEnum(typeName);
 
-            std::vector<Token> namedTokens;
-            int64_t startValue = 0;
-            while (canConsume(TokenType::NAMEDTOKEN))
+            if (canConsume(TokenType::NAMEDTOKEN))
             {
-                next();
-                namedTokens.emplace_back(current());
-                enumType->addEnumValue(current().lexical(), startValue);
-                if (tryConsume(TokenType::EQUAL))
+                int64_t startValue = 0;
+                while (canConsume(TokenType::NAMEDTOKEN))
                 {
-                    const auto number = std::dynamic_pointer_cast<NumberNode>(parseNumber());
-                    startValue = number->getValue();
-                }
-                tryConsume(TokenType::COMMA);
+                    next();
+                    enumType->addEnumValue(current().lexical(), startValue);
+                    if (tryConsume(TokenType::EQUAL))
+                    {
+                        const auto number = std::dynamic_pointer_cast<NumberNode>(parseNumber());
+                        startValue = number->getValue();
+                    }
+                    tryConsume(TokenType::COMMA);
 
-                startValue++;
+                    startValue++;
+                }
+                m_typeDefinitions.emplace(typeName, enumType);
+            }
+            else if (canConsume(TokenType::NUMBER))
+            {
+                const auto startNumber = std::dynamic_pointer_cast<NumberNode>(parseNumber());
+                consume(TokenType::DOT);
+                consume(TokenType::DOT);
+                const auto endNumber = std::dynamic_pointer_cast<NumberNode>(parseNumber());
+                m_typeDefinitions.emplace(typeName, std::make_shared<ValueRangeType>(typeName, startNumber->getValue(),
+                                                                                     endNumber->getValue()));
             }
             consume(TokenType::RIGHT_CURLY);
             consume(TokenType::SEMICOLON);
-
-            m_typeDefinitions.emplace(typeName, enumType);
         }
     }
 }

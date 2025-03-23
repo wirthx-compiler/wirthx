@@ -14,6 +14,7 @@
 #include "types/FileType.h"
 #include "types/RangeType.h"
 #include "types/StringType.h"
+#include "types/ValueRangeType.h"
 
 
 static std::vector<std::string> knownSystemCalls = {"writeln",    "write",  "printf",    "exit",  "low",     "high",
@@ -229,6 +230,33 @@ llvm::Value *SystemFunctionCallNode::codegen_write(std::unique_ptr<Context> &con
         else if (auto fileType = std::dynamic_pointer_cast<FileType>(type))
         {
             continue;
+        }
+        else if (auto rangeType = std::dynamic_pointer_cast<ValueRangeType>(type))
+        {
+            if (context->TargetTriple->getOS() == llvm::Triple::Win32)
+            {
+                if (rangeType->length() > 32)
+                    ArgsV.push_back(context->Builder->CreateGlobalString("%lli", "format_int64"));
+                else if (rangeType->length() == 8)
+                    ArgsV.push_back(context->Builder->CreateGlobalString("%c", "format_char"));
+                else
+                    ArgsV.push_back(context->Builder->CreateGlobalString("%i", "format_int"));
+            }
+            else
+            {
+                if (rangeType->length() > 32)
+                    ArgsV.push_back(context->Builder->CreateGlobalString("%ld", "format_int64"));
+                else if (rangeType->length() == 8)
+                    ArgsV.push_back(context->Builder->CreateGlobalString("%c", "format_char"));
+                else
+                    ArgsV.push_back(context->Builder->CreateGlobalString("%d", "format_int"));
+            }
+
+            ArgsV.push_back(argValue);
+        }
+        else
+        {
+            assert(false && "type can not be printed");
         }
         context->Builder->CreateCall(fprintf, ArgsV);
 
