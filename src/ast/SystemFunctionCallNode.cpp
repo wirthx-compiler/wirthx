@@ -12,12 +12,14 @@
 #include "UnitNode.h"
 #include "compiler/Context.h"
 #include "types/FileType.h"
+#include "types/RangeType.h"
 #include "types/StringType.h"
+#include "types/ValueRangeType.h"
 
 
-static std::vector<std::string> knownSystemCalls = {"writeln",    "write",  "printf",    "exit",  "low",    "high",
-                                                    "setlength",  "length", "pchar",     "new",   "halt",   "assert",
-                                                    "assignfile", "readln", "closefile", "reset", "rewrite"};
+static std::vector<std::string> knownSystemCalls = {"writeln",    "write",  "printf",    "exit",  "low",     "high",
+                                                    "setlength",  "length", "pchar",     "new",   "halt",    "assert",
+                                                    "assignfile", "readln", "closefile", "reset", "rewrite", "ord"};
 
 bool isKnownSystemCall(const std::string &name)
 {
@@ -229,6 +231,33 @@ llvm::Value *SystemFunctionCallNode::codegen_write(std::unique_ptr<Context> &con
         {
             continue;
         }
+        else if (auto rangeType = std::dynamic_pointer_cast<ValueRangeType>(type))
+        {
+            if (context->TargetTriple->getOS() == llvm::Triple::Win32)
+            {
+                if (rangeType->length() > 32)
+                    ArgsV.push_back(context->Builder->CreateGlobalString("%lli", "format_int64"));
+                else if (rangeType->length() == 8)
+                    ArgsV.push_back(context->Builder->CreateGlobalString("%c", "format_char"));
+                else
+                    ArgsV.push_back(context->Builder->CreateGlobalString("%i", "format_int"));
+            }
+            else
+            {
+                if (rangeType->length() > 32)
+                    ArgsV.push_back(context->Builder->CreateGlobalString("%ld", "format_int64"));
+                else if (rangeType->length() == 8)
+                    ArgsV.push_back(context->Builder->CreateGlobalString("%c", "format_char"));
+                else
+                    ArgsV.push_back(context->Builder->CreateGlobalString("%d", "format_int"));
+            }
+
+            ArgsV.push_back(argValue);
+        }
+        else
+        {
+            assert(false && "type can not be printed");
+        }
         context->Builder->CreateCall(fprintf, ArgsV);
 
         // size_t fwrite( const void* buffer, size_t size, size_t count,
@@ -333,6 +362,10 @@ llvm::Value *SystemFunctionCallNode::codegen(std::unique_ptr<Context> &context)
         {
             return context->Builder->getInt64(0);
         }
+        if (const auto range = std::dynamic_pointer_cast<RangeType>(paramType))
+        {
+            return context->Builder->getInt64(range->lowerBounds());
+        }
     }
     else if (iequals(m_name, "high"))
     {
@@ -348,6 +381,10 @@ llvm::Value *SystemFunctionCallNode::codegen(std::unique_ptr<Context> &context)
         if (const auto stringType = std::dynamic_pointer_cast<StringType>(paramType))
         {
             return context->Builder->CreateSub(codegen_length(context, parent), context->Builder->getInt64(1));
+        }
+        if (const auto range = std::dynamic_pointer_cast<RangeType>(paramType))
+        {
+            return context->Builder->getInt64(range->upperBounds());
         }
     }
     else if (iequals(m_name, "length"))
@@ -403,6 +440,12 @@ llvm::Value *SystemFunctionCallNode::codegen(std::unique_ptr<Context> &context)
         return codegen_assert(context, parent, m_args[0].get(), m_args[0]->codegen(context),
                               m_args[0]->expressionToken().lexical());
     }
+    else if (iequals(m_name, "ord"))
+    {
+        const auto argValue = m_args[0]->codegen(context);
+        return argValue;
+    }
+
     return FunctionCallNode::codegen(context);
 }
 
@@ -429,6 +472,10 @@ std::shared_ptr<VariableType> SystemFunctionCallNode::resolveType(const std::uni
     if (iequals(m_name, "pchar"))
     {
         return PointerType::getPointerTo(IntegerType::getInteger(8));
+    }
+    if (iequals(m_name, "ord"))
+    {
+        return IntegerType::getInteger(32);
     }
 
     return nullptr;

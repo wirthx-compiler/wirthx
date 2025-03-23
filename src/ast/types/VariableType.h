@@ -16,7 +16,8 @@ enum class VariableBaseType
     Boolean,
     Pointer,
     Unknown,
-    File
+    File,
+    Enum
 };
 
 namespace llvm

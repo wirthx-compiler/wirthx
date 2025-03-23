@@ -56,6 +56,7 @@ file(GLOB SRC
         src/ast/VariableAccessNode.cpp
         src/ast/ArrayAccessNode.cpp
         src/ast/FieldAccessNode.cpp
+        src/ast/EnumAccessNode.cpp
         src/ast/LogicalExpressionNode.cpp
         src/ast/IfConditionNode.cpp
         src/ast/WhileNode.cpp
@@ -74,6 +75,9 @@ file(GLOB SRC
         src/ast/types/RecordType.cpp
         src/ast/types/StringType.cpp
         src/ast/types/FileType.cpp
+        src/ast/types/RangeType.cpp
+        src/ast/types/EnumType.cpp
+        src/ast/types/ValueRangeType.cpp
         src/ast/ForNode.cpp
         src/ast/RepeatUntilNode.cpp
         src/ast/BreakNode.cpp

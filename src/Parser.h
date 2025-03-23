@@ -13,6 +13,7 @@
 #include <unordered_map>
 
 
+class EnumType;
 class Parser
 {
     std::vector<std::filesystem::path> m_rtlDirectories;
@@ -60,6 +61,8 @@ class Parser
     std::shared_ptr<ASTNode> parseKeyword(size_t scope, bool withSemicolon);
     std::shared_ptr<ASTNode> parseFunctionCall(size_t scope);
     std::shared_ptr<ASTNode> parseVariableAssignment(size_t scope);
+    std::optional<std::shared_ptr<EnumType>> tryGetEnumTypeByValue(const std::string &enumKey) const;
+
     std::shared_ptr<ASTNode> parseVariableAccess(size_t scope);
     std::shared_ptr<ASTNode> parseToken(size_t scope);
     std::shared_ptr<FunctionDefinitionNode> parseFunctionDeclaration(size_t scope, bool isFunction);
