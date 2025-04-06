@@ -5,7 +5,7 @@
 #include "CaseNode.h"
 
 #include <cassert>
-#include <llvm-18/llvm/IR/IRBuilder.h>
+#include <llvm/IR/IRBuilder.h>
 #include <utility>
 
 #include "compiler/Context.h"
