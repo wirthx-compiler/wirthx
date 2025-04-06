@@ -522,3 +522,25 @@ TEST(LexerTest, ParseArray)
     ASSERT_EQ(result[i].tokenType, TokenType::RIGHT_SQUAR);
     ASSERT_EQ(result[i].lexical(), "]"sv);
 }
+
+TEST(LexerTest, CaseTest)
+{
+    Lexer lexer;
+    auto result = lexer.tokenize("filename.pas", R"(
+        case color of
+            RED: writeln('red');
+        end;
+            )");
+
+    EXPECT_EQ(result.size(), 13);
+    size_t i = 0;
+    ASSERT_EQ(result[i].tokenType, TokenType::KEYWORD);
+    ASSERT_EQ(result[i].lexical(), "case"sv);
+    i++;
+    ASSERT_EQ(result[i].tokenType, TokenType::NAMEDTOKEN);
+    ASSERT_EQ(result[i].lexical(), "color"sv);
+    i++;
+    ASSERT_EQ(result[i].tokenType, TokenType::KEYWORD);
+    ASSERT_EQ(result[i].lexical(), "of"sv);
+    i++;
+}

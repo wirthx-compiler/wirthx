@@ -13,6 +13,7 @@
 #include "ast/BinaryOperationNode.h"
 #include "ast/BooleanNode.h"
 #include "ast/BreakNode.h"
+#include "ast/CaseNode.h"
 #include "ast/CharConstantNode.h"
 #include "ast/ComparissionNode.h"
 #include "ast/DoubleNode.h"
@@ -1440,6 +1441,33 @@ std::shared_ptr<ASTNode> Parser::parseKeyword(size_t scope, bool withSemicolon)
         if (withSemicolon)
             tryConsume(TokenType::SEMICOLON);
         return std::make_shared<BreakNode>(current());
+    }
+
+    if (tryConsumeKeyWord("case"))
+    {
+        auto token = current();
+        auto identifier = parseToken(scope);
+        consumeKeyWord("of");
+        std::vector<Selector> selectors;
+        while (auto selector = parseToken(scope))
+        {
+            consume(TokenType::COLON);
+
+            auto expression = parseExpression(scope);
+            selectors.emplace_back(selector, expression);
+            tryConsume(TokenType::SEMICOLON);
+        }
+        std::optional<std::shared_ptr<ASTNode>> elseExpression = std::nullopt;
+        if (tryConsumeKeyWord("else"))
+        {
+            elseExpression = parseExpression(scope);
+            tryConsume(TokenType::SEMICOLON);
+        }
+        consumeKeyWord("end");
+        if (withSemicolon)
+            tryConsume(TokenType::SEMICOLON);
+
+        return std::make_shared<CaseNode>(token, identifier, selectors, elseExpression.value_or(nullptr));
     }
 
     m_errors.push_back(

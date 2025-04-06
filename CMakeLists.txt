@@ -81,6 +81,7 @@ file(GLOB SRC
         src/ast/ForNode.cpp
         src/ast/RepeatUntilNode.cpp
         src/ast/BreakNode.cpp
+        src/ast/CaseNode.cpp
         src/compiler/intrinsics.cpp
         src/compiler/CompilerOptions.cpp
         src/compiler/Context.cpp
