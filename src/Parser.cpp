@@ -128,7 +128,7 @@ bool Parser::consumeKeyWord(const std::string &keyword)
         return true;
     }
     m_errors.push_back(ParserError{.token = m_tokens[m_current + 1],
-                                   .message = "expected keyword  '" + keyword + "' but found " +
+                                   .message = "expected keyword '" + keyword + "' but found " +
                                               std::string(m_tokens[m_current + 1].lexical()) + "!"});
     throw ParserException(m_errors);
 }
@@ -1447,21 +1447,24 @@ std::shared_ptr<ASTNode> Parser::parseKeyword(size_t scope, bool withSemicolon)
     {
         auto token = current();
         auto identifier = parseToken(scope);
+        if (!identifier)
+        {
+            m_errors.push_back(ParserError{.token = token,
+                                           .message = "expected a variable name but found " + token.lexical() + "!"});
+        }
         consumeKeyWord("of");
         std::vector<Selector> selectors;
         while (auto selector = parseToken(scope))
         {
             consume(TokenType::COLON);
 
-            auto expression = parseExpression(scope);
+            auto expression = parseStatement(scope);
             selectors.emplace_back(selector, expression);
-            tryConsume(TokenType::SEMICOLON);
         }
         std::optional<std::shared_ptr<ASTNode>> elseExpression = std::nullopt;
         if (tryConsumeKeyWord("else"))
         {
-            elseExpression = parseExpression(scope);
-            tryConsume(TokenType::SEMICOLON);
+            elseExpression = parseStatement(scope);
         }
         consumeKeyWord("end");
         if (withSemicolon)

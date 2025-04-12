@@ -7,8 +7,9 @@
 #include "ast/types/VariableType.h"
 
 
-void createSystemCall(std::unique_ptr<Context> &context, std::string functionName,
-                      std::vector<FunctionArgument> functionparams, std::shared_ptr<VariableType> returnType = nullptr);
+void createSystemCall(std::unique_ptr<Context> &context, const std::string &functionName,
+                      const std::vector<FunctionArgument> &functionParams,
+                      const std::shared_ptr<VariableType> &returnType = nullptr);
 
 void createPrintfCall(const std::unique_ptr<Context> &context);
 void createFPrintfCall(const std::unique_ptr<Context> &context);

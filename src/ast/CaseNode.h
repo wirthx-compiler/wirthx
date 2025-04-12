@@ -22,6 +22,7 @@ private:
     std::vector<Selector> m_selectors;
     std::shared_ptr<ASTNode> m_elseExpression;
     llvm::Value *codegen_constants(std::unique_ptr<Context> &context);
+    llvm::Value *codegen_strings(std::unique_ptr<Context> &context);
 
 public:
     explicit CaseNode(const Token &token, std::shared_ptr<ASTNode> selector, std::vector<Selector> selectors,
@@ -30,6 +31,7 @@ public:
     void print() override;
     llvm::Value *codegen(std::unique_ptr<Context> &context) override;
     std::optional<std::shared_ptr<ASTNode>> block() override;
+    void typeCheck(const std::unique_ptr<UnitNode> &unit, ASTNode *parentNode) override;
 };
 
 
