@@ -62,9 +62,9 @@ llvm::Value *CaseNode::codegen_strings(std::unique_ptr<Context> &context)
 
         std::vector arguments = {value, selectorValue};
 
-        auto lhs = context->Builder->CreateCall(compareFunction, arguments);
-        auto rhs = context->Builder->getInt32(0);
-        auto condition = context->Builder->CreateICmpEQ(lhs, rhs);
+        const auto lhs = context->Builder->CreateCall(compareFunction, arguments);
+        const auto rhs = context->Builder->getInt32(0);
+        const auto condition = context->Builder->CreateICmpEQ(lhs, rhs);
         const auto selectorTrueBlock = llvm::BasicBlock::Create(*context->TheContext, "caseTrue", function);
         if (caseIndex == m_selectors.size() - 1)
         {
