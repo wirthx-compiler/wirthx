@@ -1,8 +1,8 @@
 #include "MinusNode.h"
 
 #include <cassert>
-#include <llvm-18/llvm/IR/Constants.h>
-#include <llvm-18/llvm/IR/IRBuilder.h>
+#include <llvm/IR/Constants.h>
+#include <llvm/IR/IRBuilder.h>
 
 #include "ast/DoubleNode.h"
 #include "ast/NumberNode.h"
