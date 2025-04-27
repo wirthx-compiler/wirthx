@@ -51,7 +51,9 @@ file(GLOB SRC
         src/ast/CharConstantNode.cpp
         src/ast/StringConstantNode.cpp
         src/ast/BinaryOperationNode.cpp
+        src/ast/MinusNode.cpp
         src/ast/InputNode.cpp
+        src/ast/TypeNode.cpp
         src/ast/ComparrisionNode.cpp
         src/ast/VariableAccessNode.cpp
         src/ast/ArrayAccessNode.cpp
@@ -81,6 +83,7 @@ file(GLOB SRC
         src/ast/ForNode.cpp
         src/ast/RepeatUntilNode.cpp
         src/ast/BreakNode.cpp
+        src/ast/CaseNode.cpp
         src/compiler/intrinsics.cpp
         src/compiler/CompilerOptions.cpp
         src/compiler/Context.cpp

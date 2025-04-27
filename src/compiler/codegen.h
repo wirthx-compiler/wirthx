@@ -19,6 +19,10 @@ namespace codegen
     llvm::Value *codegen_ifexpr(std::unique_ptr<Context> &context, llvm::Value *condition,
                                 std::function<void(std::unique_ptr<Context> &)> body);
 
+    llvm::Value *codegen_ifelseexpr(std::unique_ptr<Context> &context, llvm::Value *condition,
+                                    std::function<void(std::unique_ptr<Context> &)> ifExpressions,
+                                    std::function<void(std::unique_ptr<Context> &)> elseExpressions);
+
     llvm::Value *codegen_while(std::unique_ptr<Context> &context, llvm::Value *condition,
                                std::function<void(std::unique_ptr<Context> &)> body);
 } // namespace codegen

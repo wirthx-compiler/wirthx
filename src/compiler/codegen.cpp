@@ -30,6 +30,56 @@ llvm::Value *codegen::codegen_ifexpr(std::unique_ptr<Context> &context, llvm::Va
 
     return CondV;
 }
+
+llvm::Value *codegen::codegen_ifelseexpr(std::unique_ptr<Context> &context, llvm::Value *condition,
+                                         std::function<void(std::unique_ptr<Context> &)> ifExpressions,
+                                         std::function<void(std::unique_ptr<Context> &)> elseExpressions)
+{
+    if (!condition)
+        return nullptr;
+
+    // Convert condition to a bool by comparing non-equal to 0.0.
+    condition = context->Builder->CreateICmpEQ(condition, context->Builder->getTrue(), "ifcond");
+    llvm::Function *TheFunction = context->Builder->GetInsertBlock()->getParent();
+
+    // Create blocks for the then and else cases.  Insert the 'then' block at the
+    // end of the function.
+    llvm::BasicBlock *ThenBB = llvm::BasicBlock::Create(*context->TheContext, "then", TheFunction);
+    llvm::BasicBlock *ElseBB = llvm::BasicBlock::Create(*context->TheContext, "else");
+    llvm::BasicBlock *MergeBB = llvm::BasicBlock::Create(*context->TheContext, "ifcont");
+    context->Builder->CreateCondBr(condition, ThenBB, ElseBB);
+
+    // Emit then value.
+    context->Builder->SetInsertPoint(ThenBB);
+
+    ifExpressions(context);
+    if (!context->BreakBlock.BlockUsed)
+        context->Builder->CreateBr(MergeBB);
+    // Codegen of 'Then' can change the current block, update ThenBB for the PHI.
+    ThenBB = context->Builder->GetInsertBlock();
+
+    // Emit else block.
+    TheFunction->insert(TheFunction->end(), ElseBB);
+    context->Builder->SetInsertPoint(ElseBB);
+
+    elseExpressions(context);
+    if (!context->BreakBlock.BlockUsed)
+        context->Builder->CreateBr(MergeBB);
+    // Codegen of 'Else' can change the current block, update ElseBB for the PHI.
+    ElseBB = context->Builder->GetInsertBlock();
+
+    // Emit merge block.
+    TheFunction->insert(TheFunction->end(), MergeBB);
+    context->Builder->SetInsertPoint(MergeBB);
+    // llvm::PHINode *PN =
+    //     context->Builder->CreatePHI(llvm::Type::getInt64Ty(*context->TheContext), 2, "iftmp");
+
+    // PN->addIncoming(ThenV, ThenBB);
+    // PN->addIncoming(ElseV, ElseBB);
+    // return PN;
+    return condition;
+}
+
 llvm::Value *codegen::codegen_while(std::unique_ptr<Context> &context, llvm::Value *condition,
                                     std::function<void(std::unique_ptr<Context> &)> body)
 {

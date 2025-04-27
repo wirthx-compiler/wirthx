@@ -14,7 +14,8 @@ inline std::vector<std::string> possible_tokens = {"program",   "unit",         
                                                    "record",    "external",     "name",
                                                    "mod",       "inline",       "implementation",
                                                    "interface", "finalization", "initialization",
-                                                   "div",       "downto",       "file"};
+                                                   "div",       "downto",       "file",
+                                                   "case"};
 
 inline std::vector<std::string> macro_token{"ifdef", "else", "endif"};
 

@@ -244,6 +244,12 @@ void LanguageServer::handleRequest()
                     textDocumentSync["change"] = 1;
                     capabilities["textDocumentSync"] = std::move(textDocumentSync);
                     result["capabilities"] = std::move(capabilities);
+
+                    llvm::json::Object completionProvider;
+                    std::vector<std::string> triggerCharacters = {"."};
+                    completionProvider["triggerCharacters"] = triggerCharacters;
+                    result["completionProvider"] = std::move(completionProvider);
+
                     llvm::json::Object serverInfo;
                     serverInfo["name"] = "wirthx";
                     serverInfo["version"] = "0.1";

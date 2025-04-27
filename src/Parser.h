@@ -14,6 +14,8 @@
 
 
 class EnumType;
+
+
 class Parser
 {
     std::vector<std::filesystem::path> m_rtlDirectories;
@@ -32,6 +34,8 @@ class Parser
 
     Token next();
     Token current();
+    [[nodiscard]] bool isConstantDefined(const std::string_view &name, const size_t scope);
+
     [[nodiscard]] bool isVariableDefined(const std::string_view &name, size_t scope);
     [[nodiscard]] bool hasNext() const;
     bool consume(TokenType tokenType);
@@ -45,6 +49,8 @@ class Parser
     determinVariableTypeByName(const std::string &name) const;
     std::shared_ptr<ASTNode> parseEscapedString(const Token &token);
     std::shared_ptr<ASTNode> parseNumber();
+    std::optional<std::shared_ptr<VariableType>> parseVariableType(size_t scope, bool includeErrors,
+                                                                   const std::string &typeName = "");
     void parseTypeDefinitions(size_t scope);
     std::optional<VariableDefinition> parseConstantDefinition(size_t scope);
     std::shared_ptr<ASTNode> parseArrayConstructor(size_t size);
@@ -62,16 +68,19 @@ class Parser
     std::shared_ptr<ASTNode> parseFunctionCall(size_t scope);
     std::shared_ptr<ASTNode> parseVariableAssignment(size_t scope);
     std::optional<std::shared_ptr<EnumType>> tryGetEnumTypeByValue(const std::string &enumKey) const;
-
+    std::shared_ptr<ASTNode> parseConstantAccess(size_t scope);
     std::shared_ptr<ASTNode> parseVariableAccess(size_t scope);
     std::shared_ptr<ASTNode> parseToken(size_t scope);
+    std::shared_ptr<ASTNode> parseRangeElementOrType(size_t scope);
+    std::shared_ptr<ASTNode> parseRangeElement(const size_t scope);
+
     std::shared_ptr<FunctionDefinitionNode> parseFunctionDeclaration(size_t scope, bool isFunction);
     std::shared_ptr<FunctionDefinitionNode> parseFunctionDefinition(size_t scope, bool isFunction);
 
     std::unique_ptr<UnitNode> parseUnit(bool includeSystem);
     bool importUnit(const Token &token, const std::string &filename, bool includeSystem = true);
 
-    bool isFunctionDeclared(const std::string &name);
+    bool isFunctionDeclared(const std::string &name) const;
 
     [[nodiscard]] std::unique_ptr<UnitNode> parseUnit();
     [[nodiscard]] std::unique_ptr<UnitNode> parseProgram();
@@ -86,7 +95,7 @@ public:
     ~Parser() = default;
     [[nodiscard]] bool hasError() const;
     [[nodiscard]] bool hasMessages() const;
-    void printErrors(std::ostream &outputStream, bool printColor);
+    void printErrors(std::ostream &outputStream, bool printColor) const;
 
     [[nodiscard]] std::unique_ptr<UnitNode> parseFile();
     std::vector<ParserError> getErrors() { return m_errors; }

@@ -13,6 +13,7 @@
 #include "ast/BinaryOperationNode.h"
 #include "ast/BooleanNode.h"
 #include "ast/BreakNode.h"
+#include "ast/CaseNode.h"
 #include "ast/CharConstantNode.h"
 #include "ast/ComparissionNode.h"
 #include "ast/DoubleNode.h"
@@ -23,10 +24,12 @@
 #include "ast/FunctionCallNode.h"
 #include "ast/IfConditionNode.h"
 #include "ast/LogicalExpressionNode.h"
+#include "ast/MinusNode.h"
 #include "ast/NumberNode.h"
 #include "ast/RepeatUntilNode.h"
 #include "ast/StringConstantNode.h"
 #include "ast/SystemFunctionCallNode.h"
+#include "ast/TypeNode.h"
 #include "ast/VariableAccessNode.h"
 #include "ast/VariableAssignmentNode.h"
 #include "ast/WhileNode.h"
@@ -43,8 +46,7 @@ static std::unordered_map<std::string, std::unique_ptr<UnitNode>> unitCache;
 
 Parser::Parser(const std::vector<std::filesystem::path> &rtlDirectories, std::filesystem::path path,
                const std::unordered_map<std::string, bool> &definitions, const std::vector<Token> &tokens) :
-    m_rtlDirectories(std::move(rtlDirectories)), m_file_path(std::move(path)), m_tokens(tokens),
-    m_definitions(definitions)
+    m_rtlDirectories(rtlDirectories), m_file_path(std::move(path)), m_tokens(tokens), m_definitions(definitions)
 {
     m_typeDefinitions["shortint"] = VariableType::getInteger(8);
     m_typeDefinitions["byte"] = VariableType::getInteger(8);
@@ -72,7 +74,7 @@ bool Parser::hasError() const
     return false;
 }
 bool Parser::hasMessages() const { return !m_errors.empty(); }
-void Parser::printErrors(std::ostream &outputStream, bool printColor)
+void Parser::printErrors(std::ostream &outputStream, const bool printColor) const
 {
     for (auto &error: m_errors)
     {
@@ -127,7 +129,7 @@ bool Parser::consumeKeyWord(const std::string &keyword)
         return true;
     }
     m_errors.push_back(ParserError{.token = m_tokens[m_current + 1],
-                                   .message = "expected keyword  '" + keyword + "' but found " +
+                                   .message = "expected keyword '" + keyword + "' but found " +
                                               std::string(m_tokens[m_current + 1].lexical()) + "!"});
     throw ParserException(m_errors);
 }
@@ -189,128 +191,180 @@ std::shared_ptr<ASTNode> Parser::parseNumber()
     base = (base > 32) ? 64 : 32;
     return std::make_shared<NumberNode>(token, value, base);
 }
-
-
 bool Parser::isVariableDefined(const std::string_view &name, const size_t scope)
 {
     return std::ranges::any_of(m_known_variable_definitions, [name, scope](const VariableDefinition &def)
                                { return iequals(def.variableName, name) && def.scopeId <= scope; });
 }
 
+bool Parser::isConstantDefined(const std::string_view &name, const size_t scope)
+{
+    return std::ranges::any_of(m_known_variable_definitions, [name, scope](const VariableDefinition &def)
+                               { return iequals(def.variableName, name) && def.scopeId <= scope && def.constant; });
+}
+
+
+std::optional<std::shared_ptr<VariableType>> Parser::parseVariableType(size_t scope, bool includeErrors,
+                                                                       const std::string &typeName)
+{
+
+    const auto isPointerType = tryConsume(TokenType::CARET);
+    // parse type
+    if (tryConsumeKeyWord("array"))
+    {
+        return parseArray(scope);
+    }
+    else if (tryConsumeKeyWord("record"))
+    {
+        std::vector<VariableDefinition> fieldDefinitions;
+
+        while (!canConsumeKeyWord("end"))
+        {
+            for (const auto &definition: parseVariableDefinitions(scope))
+                fieldDefinitions.emplace_back(definition);
+        }
+
+        consumeKeyWord("end");
+        return std::make_shared<RecordType>(fieldDefinitions, typeName);
+    }
+    else if (canConsume(TokenType::NAMEDTOKEN) || canConsume(TokenType::MINUS))
+    {
+
+        if (canConsume(TokenType::DOT, 2) || canConsume(TokenType::DOT, 3))
+        {
+            const auto startConstant = parseRangeElement(scope);
+            consume(TokenType::DOT);
+            consume(TokenType::DOT);
+            const auto endConstant = parseRangeElement(scope);
+            if (const auto startNumber = std::dynamic_pointer_cast<NumberNode>(startConstant))
+            {
+                if (const auto endNumber = std::dynamic_pointer_cast<NumberNode>(endConstant))
+                {
+                    return std::make_shared<ValueRangeType>(typeName, startNumber->getValue(), endNumber->getValue());
+                }
+                else if (const auto accessNode = std::dynamic_pointer_cast<VariableAccessNode>(endConstant))
+                {
+                    const auto varName = accessNode->expressionToken().lexical();
+                    for (auto &var: m_known_variable_definitions)
+                    {
+                        if (iequals(var.variableName, varName))
+                        {
+                            if (var.constant)
+                            {
+                                if (const auto valueNode = std::dynamic_pointer_cast<NumberNode>(var.value))
+                                {
+                                    return std::make_shared<ValueRangeType>(typeName, startNumber->getValue(),
+                                                                            valueNode->getValue());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        else
+        {
+            consume(TokenType::NAMEDTOKEN);
+        }
+
+        const auto internalTypeName = current().lexical();
+        const auto internalType = determinVariableTypeByName(internalTypeName);
+        if (!internalType.has_value())
+        {
+            if (includeErrors)
+            {
+                m_errors.push_back(ParserError{
+                        .token = current(), .message = "The type " + internalTypeName + " could not be determined!"});
+            }
+            m_current--;
+            return std::nullopt;
+        }
+
+        if (isPointerType)
+        {
+            return PointerType::getPointerTo(internalType.value());
+        }
+        else
+        {
+            return internalType.value();
+        }
+    }
+    else if (tryConsume(TokenType::LEFT_CURLY))
+    {
+
+        if (canConsume(TokenType::NAMEDTOKEN))
+        {
+            auto enumType = EnumType::getEnum(typeName);
+
+            int64_t startValue = 0;
+            while (canConsume(TokenType::NAMEDTOKEN))
+            {
+                next();
+                enumType->addEnumValue(current().lexical(), startValue);
+                if (tryConsume(TokenType::EQUAL))
+                {
+                    const auto number = std::dynamic_pointer_cast<NumberNode>(parseNumber());
+                    startValue = number->getValue();
+                }
+                tryConsume(TokenType::COMMA);
+
+                startValue++;
+            }
+            consume(TokenType::RIGHT_CURLY);
+            return enumType;
+        }
+        else if (canConsume(TokenType::NUMBER))
+        {
+            const auto startNumber = std::dynamic_pointer_cast<NumberNode>(parseNumber());
+            consume(TokenType::DOT);
+            consume(TokenType::DOT);
+            const auto endNumber = std::dynamic_pointer_cast<NumberNode>(parseNumber());
+            consume(TokenType::RIGHT_CURLY);
+            return std::make_shared<ValueRangeType>(typeName, startNumber->getValue(), endNumber->getValue());
+        }
+    }
+    return std::nullopt;
+}
+
+
 void Parser::parseTypeDefinitions(const size_t scope)
 {
     // parse type definitions
     while (tryConsume(TokenType::NAMEDTOKEN))
     {
-
         const auto typeName = current().lexical();
         consume(TokenType::EQUAL);
-        const auto isPointerType = tryConsume(TokenType::CARET);
-        // parse type
-        if (tryConsumeKeyWord("array"))
+        if (const auto type = parseVariableType(scope, true, typeName); type.has_value())
         {
-            m_typeDefinitions[typeName] = parseArray(scope);
-
-            consume(TokenType::SEMICOLON);
-        }
-        else if (tryConsumeKeyWord("record"))
-        {
-            std::vector<VariableDefinition> fieldDefinitions;
-
-            while (!canConsumeKeyWord("end"))
-            {
-                for (const auto &definition: parseVariableDefinitions(scope))
-                    fieldDefinitions.emplace_back(definition);
-            }
-
-            consumeKeyWord("end");
-            consume(TokenType::SEMICOLON);
-
-
-            m_typeDefinitions[typeName] = std::make_shared<RecordType>(fieldDefinitions, typeName);
-        }
-        else if (tryConsume(TokenType::NAMEDTOKEN))
-        {
-
-            auto internalTypeName = current().lexical();
-            auto internalType = determinVariableTypeByName(internalTypeName);
-            if (!internalType.has_value())
-            {
-                m_errors.push_back(ParserError{
-                        .token = current(), .message = "The type " + internalTypeName + " could not be determined!"});
-                continue;
-            }
-            if (isPointerType)
-            {
-                m_typeDefinitions[typeName] = PointerType::getPointerTo(internalType.value());
-            }
-            else
-            {
-                m_typeDefinitions[typeName] = internalType.value();
-            }
-
-            consume(TokenType::SEMICOLON);
-        }
-        else if (tryConsume(TokenType::LEFT_CURLY))
-        {
-            auto enumType = EnumType::getEnum(typeName);
-
-            if (canConsume(TokenType::NAMEDTOKEN))
-            {
-                int64_t startValue = 0;
-                while (canConsume(TokenType::NAMEDTOKEN))
-                {
-                    next();
-                    enumType->addEnumValue(current().lexical(), startValue);
-                    if (tryConsume(TokenType::EQUAL))
-                    {
-                        const auto number = std::dynamic_pointer_cast<NumberNode>(parseNumber());
-                        startValue = number->getValue();
-                    }
-                    tryConsume(TokenType::COMMA);
-
-                    startValue++;
-                }
-                m_typeDefinitions.emplace(typeName, enumType);
-            }
-            else if (canConsume(TokenType::NUMBER))
-            {
-                const auto startNumber = std::dynamic_pointer_cast<NumberNode>(parseNumber());
-                consume(TokenType::DOT);
-                consume(TokenType::DOT);
-                const auto endNumber = std::dynamic_pointer_cast<NumberNode>(parseNumber());
-                m_typeDefinitions.emplace(typeName, std::make_shared<ValueRangeType>(typeName, startNumber->getValue(),
-                                                                                     endNumber->getValue()));
-            }
-            consume(TokenType::RIGHT_CURLY);
+            m_typeDefinitions[typeName] = type.value();
             consume(TokenType::SEMICOLON);
         }
     }
 }
 std::shared_ptr<ArrayType> Parser::parseArray(size_t scope)
 {
-    auto isFixedArray = tryConsume(TokenType::LEFT_SQUAR);
+    const auto isFixedArray = tryConsume(TokenType::LEFT_SQUAR);
     size_t arrayStart = 0;
     size_t arrayEnd = 0;
     if (isFixedArray)
     {
 
-        auto arrayStartNode = parseToken(scope);
-        if (auto node = std::dynamic_pointer_cast<NumberNode>(arrayStartNode))
+        const auto arrayStartNode = parseToken(scope);
+        if (const auto node = std::dynamic_pointer_cast<NumberNode>(arrayStartNode))
         {
             arrayStart = node->getValue();
         }
         consume(TokenType::DOT);
         consume(TokenType::DOT);
 
-        auto arrayEndNode = parseToken(scope);
-        if (auto node = std::dynamic_pointer_cast<NumberNode>(arrayEndNode))
+        const auto arrayEndNode = parseToken(scope);
+        if (const auto node = std::dynamic_pointer_cast<NumberNode>(arrayEndNode))
         {
             arrayEnd = node->getValue();
         }
-        else if (auto node = std::dynamic_pointer_cast<VariableAccessNode>(arrayEndNode))
+        else if (const auto accessNode = std::dynamic_pointer_cast<VariableAccessNode>(arrayEndNode))
         {
-            const auto varName = node->expressionToken().lexical();
+            const auto varName = accessNode->expressionToken().lexical();
             for (auto &var: m_known_variable_definitions)
             {
                 if (iequals(var.variableName, varName))
@@ -329,8 +383,8 @@ std::shared_ptr<ArrayType> Parser::parseArray(size_t scope)
     }
     consumeKeyWord("of");
     consume(TokenType::NAMEDTOKEN);
-    auto internalTypeName = std::string(current().lexical());
-    auto internalType = determinVariableTypeByName(internalTypeName);
+    const auto internalTypeName = std::string(current().lexical());
+    const auto internalType = determinVariableTypeByName(internalTypeName);
 
 
     if (isFixedArray)
@@ -803,6 +857,85 @@ std::optional<std::shared_ptr<EnumType>> Parser::tryGetEnumTypeByValue(const std
     }
     return std::nullopt;
 }
+
+std::shared_ptr<ASTNode> Parser::parseRangeElement(const size_t scope)
+{
+    if (canConsume(TokenType::NUMBER))
+    {
+        return parseNumber();
+    }
+    if (canConsume(TokenType::STRING))
+    {
+        consume(TokenType::STRING);
+
+        return std::make_shared<StringConstantNode>(current(), std::string(current().lexical()));
+    }
+    if (canConsume(TokenType::CHAR))
+    {
+        consume(TokenType::CHAR);
+        return std::make_shared<CharConstantNode>(current(), std::string(current().lexical()));
+    }
+    if (canConsume(TokenType::ESCAPED_STRING))
+    {
+        consume(TokenType::ESCAPED_STRING);
+        return parseEscapedString(current());
+    }
+
+    if (canConsume(TokenType::NAMEDTOKEN))
+    {
+        return parseConstantAccess(scope);
+    }
+    if (tryConsumeKeyWord("true"))
+    {
+        return std::make_shared<BooleanNode>(current(), true);
+    }
+    if (tryConsumeKeyWord("false"))
+    {
+        return std::make_shared<BooleanNode>(current(), false);
+    }
+    if (canConsume(TokenType::MINUS) && canConsume(TokenType::NAMEDTOKEN, 2))
+    {
+        consume(TokenType::MINUS);
+        const auto constAccessNode = parseConstantAccess(scope);
+        const auto varName = constAccessNode->expressionToken().lexical();
+        for (auto &var: m_known_variable_definitions)
+        {
+            if (iequals(var.variableName, varName))
+            {
+                if (var.constant)
+                {
+                    if (const auto valueNode = std::dynamic_pointer_cast<NumberNode>(var.value))
+                    {
+                        return std::make_shared<MinusNode>(current(), var.value);
+                    }
+                }
+            }
+        }
+    }
+    return nullptr;
+}
+
+std::shared_ptr<ASTNode> Parser::parseConstantAccess(const size_t scope)
+{
+    consume(TokenType::NAMEDTOKEN);
+    auto token = current();
+    auto constantName = std::string(current().lexical());
+
+    if (auto enumType = tryGetEnumTypeByValue(token.lexical()))
+    {
+        return std::make_shared<EnumAccessNode>(token, enumType.value());
+    }
+    if (!isConstantDefined(token.lexical(), scope))
+    {
+        m_errors.push_back(ParserError{
+                .token = token, .message = "A constant with the name '" + token.lexical() + "' is not yet defined!"});
+        return nullptr;
+    }
+    auto dereference = tryConsume(TokenType::CARET);
+
+    return std::make_shared<VariableAccessNode>(token, dereference);
+}
+
 std::shared_ptr<ASTNode> Parser::parseVariableAccess(const size_t scope)
 {
     consume(TokenType::NAMEDTOKEN);
@@ -898,6 +1031,26 @@ std::shared_ptr<ASTNode> Parser::parseToken(const size_t scope)
     if (tryConsumeKeyWord("false"))
     {
         return std::make_shared<BooleanNode>(current(), false);
+    }
+    if (canConsume(TokenType::MINUS) && canConsume(TokenType::NAMEDTOKEN, 2))
+    {
+        consume(TokenType::MINUS);
+        auto valueNode = parseToken(scope);
+        return std::make_shared<MinusNode>(current(), valueNode);
+    }
+    return nullptr;
+}
+std::shared_ptr<ASTNode> Parser::parseRangeElementOrType(const size_t scope)
+{
+
+    if (auto type = parseVariableType(scope, false); type.has_value())
+    {
+        return std::make_shared<TypeNode>(current(), type.value());
+    }
+
+    if (auto token = parseRangeElement(scope))
+    {
+        return token;
     }
     return nullptr;
 }
@@ -1442,6 +1595,36 @@ std::shared_ptr<ASTNode> Parser::parseKeyword(size_t scope, bool withSemicolon)
         return std::make_shared<BreakNode>(current());
     }
 
+    if (tryConsumeKeyWord("case"))
+    {
+        auto token = current();
+        auto identifier = parseToken(scope);
+        if (!identifier)
+        {
+            m_errors.push_back(ParserError{.token = token,
+                                           .message = "expected a variable name but found " + token.lexical() + "!"});
+        }
+        consumeKeyWord("of");
+        std::vector<Selector> selectors;
+        while (auto selector = parseRangeElementOrType(scope))
+        {
+            consume(TokenType::COLON);
+
+            auto expression = parseStatement(scope);
+            selectors.emplace_back(selector, expression);
+        }
+        std::optional<std::shared_ptr<ASTNode>> elseExpression = std::nullopt;
+        if (tryConsumeKeyWord("else"))
+        {
+            elseExpression = parseStatement(scope);
+        }
+        consumeKeyWord("end");
+        if (withSemicolon)
+            tryConsume(TokenType::SEMICOLON);
+
+        return std::make_shared<CaseNode>(token, identifier, selectors, elseExpression.value_or(nullptr));
+    }
+
     m_errors.push_back(
             ParserError{.token = m_tokens[m_current + 1],
                         .message = "unexpected keyword found " + std::string(m_tokens[m_current + 1].lexical()) + "!"});
@@ -1554,7 +1737,7 @@ bool Parser::importUnit(const Token &token, const std::string &filename, bool in
 
     return false;
 }
-bool Parser::isFunctionDeclared(const std::string &name)
+bool Parser::isFunctionDeclared(const std::string &name) const
 {
     for (const auto &function: m_functionDefinitions)
     {

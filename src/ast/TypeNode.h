@@ -1,17 +1,18 @@
 #pragma once
 #include "ASTNode.h"
 
-class NumberNode : public ASTNode
-{
-private:
-    int64_t m_value;
-    size_t m_numBits;
 
+class TypeNode final : public ASTNode
+{
 public:
-    NumberNode(const Token &token, int64_t value, size_t numBits);
-    ~NumberNode() override = default;
+    TypeNode(const Token &token, const std::shared_ptr<VariableType> &m_variable_type) :
+        ASTNode(token), m_variableType(m_variable_type)
+    {
+    }
     void print() override;
     llvm::Value *codegen(std::unique_ptr<Context> &context) override;
     std::shared_ptr<VariableType> resolveType(const std::unique_ptr<UnitNode> &unit, ASTNode *parentNode) override;
-    virtual int64_t getValue() const;
+
+private:
+    std::shared_ptr<VariableType> m_variableType;
 };
