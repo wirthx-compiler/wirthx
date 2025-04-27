@@ -4,3 +4,6 @@ blue
 red
 green
 blue
+5 is within limits
+15 is out of limits
+-5 is within limits

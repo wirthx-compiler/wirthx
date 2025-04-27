@@ -14,5 +14,5 @@ public:
     int64_t upperBounds() override;
 
     llvm::Type *generateLlvmType(std::unique_ptr<Context> &context) override;
-    size_t length() const;
+    [[nodiscard]] size_t length() const;
 };

@@ -28,6 +28,19 @@ type
         end;
     end;
 
+
+    function limit_check(value : integer) : boolean;
+    const
+        limit = 10;
+    begin
+        case value of
+            -limit..limit:
+                limit_check := true;
+        else
+            limit_check := false;
+        end;
+    end;
+
 begin
 
     print_color(RED);
@@ -37,4 +50,20 @@ begin
     print_color(name_to_color('red'));
     print_color(name_to_color('green'));
     print_color(name_to_color('blue'));
+
+
+    if limit_check(5) then
+        writeln('5 is within limits')
+    else
+        writeln('5 is out of limits');
+
+    if limit_check(15) then
+        writeln('15 is within limits')
+    else
+        writeln('15 is out of limits');
+
+    if limit_check(-5) then
+        writeln('-5 is within limits')
+    else
+        writeln('-5 is out of limits');
 end.

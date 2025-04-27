@@ -7,6 +7,7 @@
 #include "compiler/Context.h"
 #include "compiler/codegen.h"
 #include "exceptions/CompilerException.h"
+#include "types/ValueRangeType.h"
 
 
 CaseNode::CaseNode(const Token &token, std::shared_ptr<ASTNode> selector, std::vector<Selector> selectors,
@@ -93,9 +94,87 @@ llvm::Value *CaseNode::codegen_strings(std::unique_ptr<Context> &context)
 
     return nullptr;
 }
+llvm::Value *CaseNode::compareSelectorAndValue(llvm::Value *value, const std::shared_ptr<ASTNode> &selector,
+                                               std::unique_ptr<Context> &context)
+{
+
+    const auto selectorType = selector->resolveType(context->ProgramUnit, resolveParent(context));
+
+    if (const auto range = std::dynamic_pointer_cast<ValueRangeType>(selectorType))
+    {
+
+        return context->Builder->CreateAnd(
+                context->Builder->CreateICmpSGE(value, context->Builder->getInt32(range->lowerBounds())),
+                context->Builder->CreateICmpSLE(value, context->Builder->getInt32(range->upperBounds()))
+
+        );
+    }
+
+    const auto selectorValue = selector->codegen(context);
+    return context->Builder->CreateICmpEQ(value, selectorValue);
+}
+llvm::Value *CaseNode::codegen_ranges(std::unique_ptr<Context> &context)
+{
+    const auto function = context->Builder->GetInsertBlock()->getParent();
+
+    const auto value = m_selector->codegen(context);
+    const auto defaultBlock = llvm::BasicBlock::Create(*context->TheContext, "caseDefault", function);
+    llvm::BasicBlock *endBlock = llvm::BasicBlock::Create(*context->TheContext, "caseEnd", function);
+
+
+    llvm::BasicBlock *nextCaseBlock = llvm::BasicBlock::Create(*context->TheContext, "caseFalse", function);
+    size_t caseIndex = 0;
+    for (auto &[selectorNode, expression]: m_selectors)
+    {
+
+
+        const auto lhs = compareSelectorAndValue(value, selectorNode, context);
+        const auto rhs = context->Builder->getTrue();
+        const auto condition = context->Builder->CreateICmpEQ(lhs, rhs);
+        const auto selectorTrueBlock = llvm::BasicBlock::Create(*context->TheContext, "caseTrue", function);
+        if (caseIndex == m_selectors.size() - 1)
+        {
+            nextCaseBlock = defaultBlock;
+        }
+        context->Builder->CreateCondBr(condition, selectorTrueBlock, nextCaseBlock);
+        context->Builder->SetInsertPoint(selectorTrueBlock);
+        expression->codegen(context);
+        context->Builder->CreateBr(endBlock);
+        if (caseIndex < m_selectors.size() - 1)
+        {
+            context->Builder->SetInsertPoint(nextCaseBlock);
+            nextCaseBlock = llvm::BasicBlock::Create(*context->TheContext, "caseFalse", function);
+        }
+        caseIndex++;
+    }
+
+    context->Builder->SetInsertPoint(defaultBlock);
+    if (m_elseExpression)
+    {
+        m_elseExpression->codegen(context);
+    }
+    context->Builder->CreateBr(endBlock);
+
+    context->Builder->SetInsertPoint(endBlock);
+
+    return nullptr;
+}
+bool CaseNode::oneSelectorHasARangeType(const std::unique_ptr<UnitNode> &unit, ASTNode *parentNode)
+{
+    return std::ranges::any_of(m_selectors,
+                               [&unit, &parentNode](const Selector &selector)
+                               {
+                                   return std::dynamic_pointer_cast<ValueRangeType>(
+                                                  selector.selector->resolveType(unit, parentNode)) != nullptr;
+                               });
+}
 llvm::Value *CaseNode::codegen(std::unique_ptr<Context> &context)
 {
     const auto selectorType = m_selector->resolveType(context->ProgramUnit, resolveParent(context));
+    if (oneSelectorHasARangeType(context->ProgramUnit, resolveParent(context)))
+    {
+        return codegen_ranges(context);
+    }
     if (selectorType->baseType == VariableBaseType::Enum || selectorType->baseType == VariableBaseType::Integer)
     {
         return codegen_constants(context);
@@ -114,7 +193,7 @@ void CaseNode::typeCheck(const std::unique_ptr<UnitNode> &unit, ASTNode *parentN
 
     for (const auto &[selector, expression]: m_selectors)
     {
-        if (const auto selectorType2 = selector->resolveType(unit, parentNode); selectorType != selectorType2)
+        if (const auto selectorType2 = selector->resolveType(unit, parentNode); *selectorType != *selectorType2)
         {
             throw CompilerException(
                     ParserError{.token = selector->expressionToken(),

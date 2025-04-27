@@ -164,10 +164,12 @@ llvm::Value *FunctionDefinitionNode::codegen(std::unique_ptr<Context> &context)
         // Finish off the function.
 
         // Validate the generated code, checking for consistency.
-        llvm::verifyFunction(*functionDefinition);
-        if (context->compilerOptions.buildMode == BuildMode::Release)
+        if (llvm::verifyFunction(*functionDefinition, &llvm::errs()))
         {
-            context->TheFPM->run(*functionDefinition, *context->TheFAM);
+            if (context->compilerOptions.buildMode == BuildMode::Release)
+            {
+                context->TheFPM->run(*functionDefinition, *context->TheFAM);
+            }
         }
     }
 
