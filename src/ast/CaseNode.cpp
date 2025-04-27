@@ -1,6 +1,7 @@
 #include "CaseNode.h"
 
 #include <cassert>
+#include <iostream>
 #include <llvm/IR/IRBuilder.h>
 #include <utility>
 
@@ -55,7 +56,7 @@ llvm::Value *CaseNode::codegen_strings(std::unique_ptr<Context> &context)
     llvm::BasicBlock *endBlock = llvm::BasicBlock::Create(*context->TheContext, "caseEnd", function);
 
 
-    llvm::BasicBlock *nextCaseBlock = llvm::BasicBlock::Create(*context->TheContext, "caseFalse", function);
+    llvm::BasicBlock *nextCaseBlock = nullptr;
     size_t caseIndex = 0;
     for (auto &[selectorNode, expression]: m_selectors)
     {
@@ -71,6 +72,10 @@ llvm::Value *CaseNode::codegen_strings(std::unique_ptr<Context> &context)
         {
             nextCaseBlock = defaultBlock;
         }
+        else
+        {
+            nextCaseBlock = llvm::BasicBlock::Create(*context->TheContext, "caseFalse", function);
+        }
         context->Builder->CreateCondBr(condition, selectorTrueBlock, nextCaseBlock);
         context->Builder->SetInsertPoint(selectorTrueBlock);
         expression->codegen(context);
@@ -78,7 +83,6 @@ llvm::Value *CaseNode::codegen_strings(std::unique_ptr<Context> &context)
         if (caseIndex < m_selectors.size() - 1)
         {
             context->Builder->SetInsertPoint(nextCaseBlock);
-            nextCaseBlock = llvm::BasicBlock::Create(*context->TheContext, "caseFalse", function);
         }
         caseIndex++;
     }
@@ -122,11 +126,10 @@ llvm::Value *CaseNode::codegen_ranges(std::unique_ptr<Context> &context)
     llvm::BasicBlock *endBlock = llvm::BasicBlock::Create(*context->TheContext, "caseEnd", function);
 
 
-    llvm::BasicBlock *nextCaseBlock = llvm::BasicBlock::Create(*context->TheContext, "caseFalse", function);
+    llvm::BasicBlock *nextCaseBlock = nullptr;
     size_t caseIndex = 0;
     for (auto &[selectorNode, expression]: m_selectors)
     {
-
 
         const auto lhs = compareSelectorAndValue(value, selectorNode, context);
         const auto rhs = context->Builder->getTrue();
@@ -136,14 +139,18 @@ llvm::Value *CaseNode::codegen_ranges(std::unique_ptr<Context> &context)
         {
             nextCaseBlock = defaultBlock;
         }
+        else
+        {
+            nextCaseBlock = llvm::BasicBlock::Create(*context->TheContext, "caseFalse", function);
+        }
         context->Builder->CreateCondBr(condition, selectorTrueBlock, nextCaseBlock);
         context->Builder->SetInsertPoint(selectorTrueBlock);
         expression->codegen(context);
         context->Builder->CreateBr(endBlock);
         if (caseIndex < m_selectors.size() - 1)
         {
+
             context->Builder->SetInsertPoint(nextCaseBlock);
-            nextCaseBlock = llvm::BasicBlock::Create(*context->TheContext, "caseFalse", function);
         }
         caseIndex++;
     }
