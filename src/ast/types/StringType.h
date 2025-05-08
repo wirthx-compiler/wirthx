@@ -1,8 +1,9 @@
 #pragma once
+#include "RangeType.h"
 #include "VariableType.h"
 
 
-class StringType : public VariableType, public FieldAccessableType
+class StringType : public VariableType, public FieldAccessableType, public RangeType
 {
 private:
     llvm::Type *llvmType = nullptr;
@@ -16,4 +17,6 @@ public:
 
     llvm::Value *generateLengthValue(const Token &token, std::unique_ptr<Context> &context) override;
     llvm::Value *generateHighValue(const Token &token, std::unique_ptr<Context> &context) override;
+    [[nodiscard]] llvm::Value *generateLowerBounds(const Token &token, std::unique_ptr<Context> &context) override;
+    [[nodiscard]] llvm::Value *generateUpperBounds(const Token &token, std::unique_ptr<Context> &context) override;
 };

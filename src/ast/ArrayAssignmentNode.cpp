@@ -14,6 +14,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Type.h"
+#include "types/ArrayType.h"
 #include "types/StringType.h"
 
 ArrayAssignmentNode::ArrayAssignmentNode(const Token &arrayToken, const std::shared_ptr<ASTNode> &indexNode,

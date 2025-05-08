@@ -4,15 +4,21 @@
 
 #ifndef RANGETYPE_H
 #define RANGETYPE_H
-#include <cstdint>
+
+#include <llvm/IR/Value.h>
+
+#include "ast/ASTNode.h"
+#include "compiler/Context.h"
 
 
 class RangeType
 {
 public:
     virtual ~RangeType() = default;
-    virtual int64_t lowerBounds() = 0;
-    virtual int64_t upperBounds() = 0;
+    [[nodiscard]] virtual llvm::Value *generateLowerBounds(const Token &token, std::unique_ptr<Context> &context) = 0;
+    [[nodiscard]] virtual llvm::Value *generateUpperBounds(const Token &token, std::unique_ptr<Context> &context) = 0;
+    virtual llvm::Value *generateFieldAccess(Token &token, llvm::Value *indexValue,
+                                             std::unique_ptr<Context> &context) = 0;
 };
 
 

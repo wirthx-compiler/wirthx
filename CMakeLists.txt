@@ -80,7 +80,9 @@ file(GLOB SRC
         src/ast/types/RangeType.cpp
         src/ast/types/EnumType.cpp
         src/ast/types/ValueRangeType.cpp
+        src/ast/types/ArrayType.cpp
         src/ast/ForNode.cpp
+        src/ast/ForEachNode.cpp
         src/ast/RepeatUntilNode.cpp
         src/ast/BreakNode.cpp
         src/ast/CaseNode.cpp

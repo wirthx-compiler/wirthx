@@ -20,6 +20,7 @@
 #include "ast/EnumAccessNode.h"
 #include "ast/FieldAccessNode.h"
 #include "ast/FieldAssignmentNode.h"
+#include "ast/ForEachNode.h"
 #include "ast/ForNode.h"
 #include "ast/FunctionCallNode.h"
 #include "ast/IfConditionNode.h"
@@ -1501,8 +1502,29 @@ std::shared_ptr<ASTNode> Parser::parseKeyword(size_t scope, bool withSemicolon)
         auto forToken = current();
         consume(TokenType::NAMEDTOKEN);
         auto loopVariable = std::string(current().lexical());
-        m_known_variable_definitions.push_back(VariableDefinition{
-                .variableType = VariableType::getInteger(64), .variableName = loopVariable, .scopeId = scope + 1});
+        auto loopVariableToken = current();
+        if (canConsumeKeyWord("in"))
+        {
+            consumeKeyWord("in");
+            auto loopExpression = parseBaseExpression(scope + 1);
+            std::vector<std::shared_ptr<ASTNode>> forNodes;
+
+            consumeKeyWord("do");
+
+            if (canConsumeKeyWord("begin"))
+            {
+                forNodes.emplace_back(parseBlock(scope + 1));
+                if (withSemicolon)
+                    tryConsume(TokenType::SEMICOLON);
+            }
+            else
+            {
+                forNodes.emplace_back(parseStatement(scope));
+            }
+            return std::make_shared<ForEachNode>(forToken, loopVariableToken, loopExpression, forNodes);
+        }
+        // m_known_variable_definitions.push_back(VariableDefinition{
+        //         .variableType = VariableType::getInteger(64), .variableName = loopVariable, .scopeId = scope + 1});
         consume(TokenType::COLON);
         consume(TokenType::EQUAL);
         auto loopStart = parseBaseExpression(scope + 1);
@@ -1613,16 +1635,27 @@ std::shared_ptr<ASTNode> Parser::parseKeyword(size_t scope, bool withSemicolon)
             auto expression = parseStatement(scope);
             selectors.emplace_back(selector, expression);
         }
-        std::optional<std::shared_ptr<ASTNode>> elseExpression = std::nullopt;
+        std::vector<std::shared_ptr<ASTNode>> elseExpressions;
         if (tryConsumeKeyWord("else"))
         {
-            elseExpression = parseStatement(scope);
+            if (!canConsumeKeyWord("begin"))
+            {
+                elseExpressions.push_back(parseStatement(scope));
+                consumeKeyWord("end");
+            }
+            else
+            {
+                elseExpressions.push_back(parseBlock(scope + 1));
+            }
         }
-        consumeKeyWord("end");
+        else
+        {
+            consumeKeyWord("end");
+        }
         if (withSemicolon)
             tryConsume(TokenType::SEMICOLON);
 
-        return std::make_shared<CaseNode>(token, identifier, selectors, elseExpression.value_or(nullptr));
+        return std::make_shared<CaseNode>(token, identifier, selectors, elseExpressions);
     }
 
     m_errors.push_back(

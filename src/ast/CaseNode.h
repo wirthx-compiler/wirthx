@@ -21,7 +21,7 @@ class CaseNode : public ASTNode
 private:
     std::shared_ptr<ASTNode> m_selector;
     std::vector<Selector> m_selectors;
-    std::shared_ptr<ASTNode> m_elseExpression;
+    std::vector<std::shared_ptr<ASTNode>> m_elseExpressions;
     llvm::Value *codegen_constants(std::unique_ptr<Context> &context);
     llvm::Value *codegen_strings(std::unique_ptr<Context> &context);
     static llvm::Value *compareSelectorAndValue(llvm::Value *value, const std::shared_ptr<ASTNode> &selector,
@@ -32,7 +32,7 @@ private:
 
 public:
     explicit CaseNode(const Token &token, std::shared_ptr<ASTNode> selector, std::vector<Selector> selectors,
-                      std::shared_ptr<ASTNode> elseExpression);
+                      std::vector<std::shared_ptr<ASTNode>> elseExpressions);
     ~CaseNode() override = default;
     void print() override;
     llvm::Value *codegen(std::unique_ptr<Context> &context) override;

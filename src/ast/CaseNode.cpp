@@ -1,20 +1,18 @@
 #include "CaseNode.h"
 
 #include <cassert>
-#include <iostream>
 #include <llvm/IR/IRBuilder.h>
 #include <utility>
 
 #include "compiler/Context.h"
-#include "compiler/codegen.h"
 #include "exceptions/CompilerException.h"
 #include "types/ValueRangeType.h"
 
 
 CaseNode::CaseNode(const Token &token, std::shared_ptr<ASTNode> selector, std::vector<Selector> selectors,
-                   std::shared_ptr<ASTNode> elseExpression) :
+                   std::vector<std::shared_ptr<ASTNode>> elseExpressions) :
     ASTNode(token), m_selector(std::move(selector)), m_selectors(std::move(selectors)),
-    m_elseExpression(std::move(elseExpression))
+    m_elseExpressions(std::move(elseExpressions))
 {
 }
 void CaseNode::print() {}
@@ -36,9 +34,12 @@ llvm::Value *CaseNode::codegen_constants(std::unique_ptr<Context> &context)
         switchInstruction->addCase(llvm::cast<llvm::ConstantInt>(selectorValue), selectorBlock);
     }
     context->Builder->SetInsertPoint(defaultBlock);
-    if (m_elseExpression)
+    if (!m_elseExpressions.empty())
     {
-        m_elseExpression->codegen(context);
+        for (const auto &elseExpression: m_elseExpressions)
+        {
+            elseExpression->codegen(context);
+        }
     }
     context->Builder->CreateBr(endBlock);
 
@@ -88,9 +89,12 @@ llvm::Value *CaseNode::codegen_strings(std::unique_ptr<Context> &context)
     }
 
     context->Builder->SetInsertPoint(defaultBlock);
-    if (m_elseExpression)
+    if (!m_elseExpressions.empty())
     {
-        m_elseExpression->codegen(context);
+        for (const auto &elseExpression: m_elseExpressions)
+        {
+            elseExpression->codegen(context);
+        }
     }
     context->Builder->CreateBr(endBlock);
 
@@ -108,10 +112,10 @@ llvm::Value *CaseNode::compareSelectorAndValue(llvm::Value *value, const std::sh
     {
 
         return context->Builder->CreateAnd(
-                context->Builder->CreateICmpSGE(value, context->Builder->getInt32(range->lowerBounds())),
-                context->Builder->CreateICmpSLE(value, context->Builder->getInt32(range->upperBounds()))
-
-        );
+                context->Builder->CreateICmpSGE(value,
+                                                range->generateLowerBounds(selector->expressionToken(), context)),
+                context->Builder->CreateICmpSLE(value,
+                                                range->generateUpperBounds(selector->expressionToken(), context)));
     }
 
     const auto selectorValue = selector->codegen(context);
@@ -156,9 +160,12 @@ llvm::Value *CaseNode::codegen_ranges(std::unique_ptr<Context> &context)
     }
 
     context->Builder->SetInsertPoint(defaultBlock);
-    if (m_elseExpression)
+    if (!m_elseExpressions.empty())
     {
-        m_elseExpression->codegen(context);
+        for (const auto &elseExpression: m_elseExpressions)
+        {
+            elseExpression->codegen(context);
+        }
     }
     context->Builder->CreateBr(endBlock);
 
@@ -208,8 +215,11 @@ void CaseNode::typeCheck(const std::unique_ptr<UnitNode> &unit, ASTNode *parentN
         }
         expression->typeCheck(unit, parentNode);
     }
-    if (m_elseExpression)
+    if (!m_elseExpressions.empty())
     {
-        m_elseExpression->typeCheck(unit, parentNode);
+        for (const auto &elseExpression: m_elseExpressions)
+        {
+            elseExpression->typeCheck(unit, parentNode);
+        }
     }
 }

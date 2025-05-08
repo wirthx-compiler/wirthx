@@ -10,9 +10,11 @@ private:
 
 public:
     ValueRangeType(const std::string &name, int64_t startValue, int64_t endValue);
-    int64_t lowerBounds() override;
-    int64_t upperBounds() override;
+
 
     llvm::Type *generateLlvmType(std::unique_ptr<Context> &context) override;
     [[nodiscard]] size_t length() const;
+    [[nodiscard]] llvm::Value *generateLowerBounds(const Token &token, std::unique_ptr<Context> &context) override;
+    [[nodiscard]] llvm::Value *generateUpperBounds(const Token &token, std::unique_ptr<Context> &context) override;
+    llvm::Value *generateFieldAccess(Token &token, llvm::Value *indexValue, std::unique_ptr<Context> &context) override;
 };

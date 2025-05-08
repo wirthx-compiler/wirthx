@@ -8,6 +8,7 @@
 #include "UnitNode.h"
 #include "VariableAccessNode.h"
 #include "compiler/Context.h"
+#include "types/ArrayType.h"
 #include "types/StringType.h"
 
 
@@ -54,8 +55,8 @@ std::shared_ptr<VariableType> ArrayAccessNode::resolveType(const std::unique_ptr
 }
 Token ArrayAccessNode::expressionToken()
 {
-    auto start = m_arrayNameToken.sourceLocation.byte_offset;
-    auto end = m_indexNode->expressionToken().sourceLocation.byte_offset;
+    const auto start = m_arrayNameToken.sourceLocation.byte_offset;
+    const auto end = m_indexNode->expressionToken().sourceLocation.byte_offset;
     Token token = m_arrayNameToken;
     token.sourceLocation.num_bytes = end - start + m_indexNode->expressionToken().sourceLocation.num_bytes + 1;
     token.sourceLocation.byte_offset = start;

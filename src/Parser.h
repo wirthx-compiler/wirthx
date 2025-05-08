@@ -12,6 +12,8 @@
 
 #include <unordered_map>
 
+#include "ast/types/ArrayType.h"
+
 
 class EnumType;
 

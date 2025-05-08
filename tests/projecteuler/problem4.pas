@@ -7,6 +7,7 @@ program problem4;
     var
         tmp : string;
         h : int64;
+        i : integer;
     begin
         tmp := Str(product);
         is_palindrom := true;
@@ -25,6 +26,8 @@ var
     palindrom : integer = 0;
     tmp : string;
     rev : string;
+    x : integer;
+    y : integer;
 begin
 
     for x := 100 to 1000 do
