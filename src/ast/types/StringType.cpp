@@ -52,17 +52,16 @@ llvm::Value *StringType::generateFieldAccess(Token &token, llvm::Value *indexVal
         return LogErrorV("Unknown variable for string access: " + arrayName);
 
 
-    auto llvmRecordType = this->generateLlvmType(context);
-    auto arrayBaseType = IntegerType::getInteger(8)->generateLlvmType(context);
+    const auto llvmRecordType = this->generateLlvmType(context);
+    const auto arrayBaseType = IntegerType::getInteger(8)->generateLlvmType(context);
 
-    auto arrayPointerOffset = context->Builder->CreateStructGEP(llvmRecordType, V, 2, "string.ptr.offset");
-    // const llvm::DataLayout &DL = context->TheModule->getDataLayout();
-    // auto alignment = DL.getPrefTypeAlign(ptrType);
-    auto loadResult =
+    const auto arrayPointerOffset = context->Builder->CreateStructGEP(llvmRecordType, V, 2, "string.ptr.offset");
+
+    const auto loadResult =
             context->Builder->CreateLoad(llvm::PointerType::getUnqual(*context->TheContext), arrayPointerOffset);
 
 
-    auto bounds =
+    const auto bounds =
             context->Builder->CreateGEP(arrayBaseType, loadResult, llvm::ArrayRef<llvm::Value *>{indexValue}, "", true);
 
     return context->Builder->CreateLoad(arrayBaseType, bounds);
@@ -107,4 +106,12 @@ llvm::Value *StringType::generateLengthValue(const Token &token, std::unique_ptr
 llvm::Value *StringType::generateHighValue(const Token &token, std::unique_ptr<Context> &context)
 {
     return context->Builder->CreateSub(generateLengthValue(token, context), context->Builder->getInt64(1));
+}
+llvm::Value *StringType::generateLowerBounds(const Token &token, std::unique_ptr<Context> &context)
+{
+    return context->Builder->getInt64(0);
+}
+llvm::Value *StringType::generateUpperBounds(const Token &token, std::unique_ptr<Context> &context)
+{
+    return generateHighValue(token, context);
 }

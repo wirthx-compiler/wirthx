@@ -1,0 +1,9 @@
+red
+green
+blue
+red
+green
+blue
+lower bound: 0
+upper bound: 16
+ this is a string

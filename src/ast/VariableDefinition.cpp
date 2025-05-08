@@ -4,6 +4,7 @@
 #include <magic_enum/magic_enum.hpp>
 #include "ASTNode.h"
 #include "compiler/Context.h"
+#include "types/ArrayType.h"
 #include "types/FileType.h"
 #include "types/RecordType.h"
 #include "types/StringType.h"

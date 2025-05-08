@@ -11,6 +11,7 @@
 #include "../compare.h"
 #include "UnitNode.h"
 #include "compiler/Context.h"
+#include "types/ArrayType.h"
 #include "types/FileType.h"
 #include "types/RangeType.h"
 #include "types/StringType.h"
@@ -364,7 +365,7 @@ llvm::Value *SystemFunctionCallNode::codegen(std::unique_ptr<Context> &context)
         }
         if (const auto range = std::dynamic_pointer_cast<RangeType>(paramType))
         {
-            return context->Builder->getInt64(range->lowerBounds());
+            return range->generateLowerBounds(expressionToken(), context);
         }
     }
     else if (iequals(m_name, "high"))
@@ -380,11 +381,11 @@ llvm::Value *SystemFunctionCallNode::codegen(std::unique_ptr<Context> &context)
         }
         if (const auto stringType = std::dynamic_pointer_cast<StringType>(paramType))
         {
-            return context->Builder->CreateSub(codegen_length(context, parent), context->Builder->getInt64(1));
+            return stringType->generateHighValue(m_args[0]->expressionToken(), context);
         }
         if (const auto range = std::dynamic_pointer_cast<RangeType>(paramType))
         {
-            return context->Builder->getInt64(range->upperBounds());
+            return range->generateUpperBounds(expressionToken(), context);
         }
     }
     else if (iequals(m_name, "length"))
