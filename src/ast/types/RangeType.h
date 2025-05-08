@@ -4,8 +4,8 @@
 
 #ifndef RANGETYPE_H
 #define RANGETYPE_H
-#include <cstdint>
-#include <llvm-18/llvm/IR/Value.h>
+
+#include <llvm/IR/Value.h>
 
 #include "ast/ASTNode.h"
 #include "compiler/Context.h"
