@@ -18,9 +18,9 @@
 #include "types/ValueRangeType.h"
 
 
-static std::vector<std::string> knownSystemCalls = {"writeln",    "write",  "printf",    "exit",  "low",     "high",
-                                                    "setlength",  "length", "pchar",     "new",   "halt",    "assert",
-                                                    "assignfile", "readln", "closefile", "reset", "rewrite", "ord"};
+static std::vector<std::string> knownSystemCalls = {
+        "writeln", "write",  "printf",     "exit",   "low",       "high",  "setlength", "length", "pchar",     "new",
+        "halt",    "assert", "assignfile", "readln", "closefile", "reset", "rewrite",   "ord",    "strdispose"};
 
 bool isKnownSystemCall(const std::string &name)
 {
@@ -255,6 +255,20 @@ llvm::Value *SystemFunctionCallNode::codegen_write(std::unique_ptr<Context> &con
 
             ArgsV.push_back(argValue);
         }
+        else if (const auto ptrType = std::dynamic_pointer_cast<PointerType>(type))
+        {
+            if (*(ptrType->pointerBase) == *(VariableType::getInteger(8)))
+            {
+                ArgsV.push_back(context->Builder->CreateGlobalString("%s", "format_string"));
+                // const auto value =
+                //         context->Builder->CreateLoad(llvm::PointerType::getUnqual(*context->TheContext), argValue);
+                ArgsV.push_back(argValue);
+            }
+            else
+            {
+                assert(false && "type can not be printed");
+            }
+        }
         else
         {
             assert(false && "type can not be printed");
@@ -445,6 +459,13 @@ llvm::Value *SystemFunctionCallNode::codegen(std::unique_ptr<Context> &context)
     {
         const auto argValue = m_args[0]->codegen(context);
         return argValue;
+    }
+    else if (iequals(m_name, "strdispose"))
+    {
+        const auto argValue = m_args[0]->codegen(context);
+        llvm::Function *CalleeF = context->TheModule->getFunction("free");
+
+        return context->Builder->CreateCall(CalleeF, argValue);
     }
 
     return FunctionCallNode::codegen(context);

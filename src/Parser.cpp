@@ -171,8 +171,12 @@ std::shared_ptr<ASTNode> Parser::parseEscapedString(const Token &token)
         if (next == std::string::npos)
             next = token.sourceLocation.num_bytes;
         auto tmp = token.lexical().substr(x, next - x);
-        result += std::atoi(tmp.data());
+        result += static_cast<char>(std::atoi(tmp.data()));
         x = next + 1;
+    }
+    if (result.size() == 1)
+    {
+        return std::make_shared<CharConstantNode>(token, result);
     }
     return std::make_shared<StringConstantNode>(token, result);
 }
@@ -714,6 +718,13 @@ std::shared_ptr<ASTNode> Parser::parseBaseExpression(const size_t scope, const s
                 consume(TokenType::EQUAL);
                 auto rhs = parseBaseExpression(scope);
                 return std::make_shared<ComparrisionNode>(operatorToken, CMPOperator::LESS_EQUAL, lhs, rhs);
+            }
+            else if (canConsume(TokenType::GREATER))
+            {
+                consume(TokenType::GREATER);
+                auto rhs = parseBaseExpression(scope);
+                return parseExpression(
+                        scope, std::make_shared<ComparrisionNode>(operatorToken, CMPOperator::NOT_EQUALS, lhs, rhs));
             }
             auto rhs = parseBaseExpression(scope);
             return parseExpression(scope,

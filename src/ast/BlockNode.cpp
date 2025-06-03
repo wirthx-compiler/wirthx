@@ -145,7 +145,7 @@ std::optional<VariableDefinition> BlockNode::getVariableDefinition(const std::st
 {
     for (auto def: m_variableDefinitions)
     {
-        if (def.variableName == name)
+        if (def.variableName == name or def.alias == name)
         {
             return def;
         }
