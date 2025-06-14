@@ -166,7 +166,6 @@ std::optional<VariableDefinition> BlockNode::getVariableDefinition(const std::st
             }
         }
     }
-    std::cerr << "No variable definition found for: " << name << "\n";
     return std::nullopt;
 }
 
