@@ -1,6 +1,6 @@
 #pragma once
 
-#include <llvm-18/llvm/IR/GlobalVariable.h>
+#include <llvm/IR/GlobalVariable.h>
 #include <string>
 
 #include "ASTNode.h"
