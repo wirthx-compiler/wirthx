@@ -35,4 +35,5 @@ public:
 
     virtual Token expressionToken() { return m_token; }
     static ASTNode *resolveParent(const std::unique_ptr<Context> &context);
+    [[nodiscard]] virtual bool tokenIsPartOfNode(const Token &token) const { return m_token == token; }
 };

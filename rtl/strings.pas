@@ -132,11 +132,11 @@ uses system;
     Compare limited number of characters of 2 null-terminated strings
 
     }
-    function strlcomp(
-      str1: pchar;
-      str2: pchar;
-      l: integer
-    ):integer;
+//    function strlcomp(
+//      str1: pchar;
+//      str2: pchar;
+//      l: integer
+//    ):integer;
 
     {
     Copy a null-terminated string, limited in length.
@@ -262,7 +262,13 @@ implementation
         stralloc[L] := #0; // Null-terminate the string
     end;
 
-
+    function AnsiCompareStr(
+      S1: string;
+      S2: string
+    ):Integer;
+    begin
+        result := CompareStr(S1, S2);
+    end;
 
     function CompareStr( S1,S2 : string) : integer;
     var

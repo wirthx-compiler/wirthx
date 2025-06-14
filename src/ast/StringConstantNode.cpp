@@ -51,7 +51,9 @@ llvm::GlobalVariable *StringConstantNode::generateConstant(std::unique_ptr<Conte
     }
 
 
-    return context->Builder->CreateGlobalString(result, ".str", 0, context->TheModule.get());
+    auto resultVar = context->Builder->CreateGlobalString(result, ".str", 0, context->TheModule.get());
+    resultVar->setLinkage(llvm::GlobalValue::PrivateLinkage);
+    return resultVar;
 }
 llvm::Value *StringConstantNode::codegen(std::unique_ptr<Context> &context)
 {

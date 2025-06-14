@@ -95,12 +95,38 @@ llvm::Value *FunctionDefinitionNode::codegen(std::unique_ptr<Context> &context)
         resultType = m_returnType->generateLlvmType(context);
     }
     llvm::FunctionType *FT = llvm::FunctionType::get(resultType, params, false);
+    auto linkage = llvm::Function::ExternalLinkage;
+    if (!m_libName.empty())
+    {
+        linkage = llvm::Function::ExternalLinkage;
+    }
+    else
+    {
+        linkage = llvm::Function::InternalLinkage;
+    }
 
-    llvm::Function *functionDefinition =
-            llvm::Function::Create(FT, llvm::Function::ExternalLinkage, functionSignature(), context->TheModule.get());
+    llvm::Function *functionDefinition = context->TheModule->getFunction(functionSignature());
+    if (!functionDefinition)
+        functionDefinition = llvm::Function::Create(FT, linkage, functionSignature(), context->TheModule.get());
+
+    // Set names for all arguments.
+    unsigned idx = 0;
+    for (auto &arg: functionDefinition->args())
+    {
+        const auto param = m_params[idx];
+        if (!param.isReference && param.type->baseType == VariableBaseType::Struct)
+        {
+            arg.addAttr(llvm::Attribute::getWithByValType(*context->TheContext, param.type->generateLlvmType(context)));
+            arg.addAttr(llvm::Attribute::NoUndef);
+        }
+
+
+        arg.setName(param.argumentName);
+        idx++;
+    }
     if (m_libName.empty())
     {
-        functionDefinition->setDSOLocal(true);
+        // functionDefinition->setDSOLocal(true);
         functionDefinition->addFnAttr(llvm::Attribute::MustProgress);
         if (!m_isProcedure && m_returnType->baseType == VariableBaseType::String)
             functionDefinition->addFnAttr(llvm::Attribute::NoFree);
@@ -118,21 +144,7 @@ llvm::Value *FunctionDefinitionNode::codegen(std::unique_ptr<Context> &context)
         }
     }
 
-    // Set names for all arguments.
-    unsigned idx = 0;
-    for (auto &arg: functionDefinition->args())
-    {
-        const auto param = m_params[idx];
-        if (!param.isReference && param.type->baseType == VariableBaseType::Struct)
-        {
-            arg.addAttr(llvm::Attribute::getWithByValType(*context->TheContext, param.type->generateLlvmType(context)));
-            arg.addAttr(llvm::Attribute::NoUndef);
-        }
 
-
-        arg.setName(param.argumentName);
-        idx++;
-    }
     context->FunctionDefinitions[functionSignature()] = functionDefinition;
     // Create a new basic block to start insertion into.
 
@@ -183,7 +195,7 @@ void FunctionDefinitionNode::typeCheck(const std::unique_ptr<UnitNode> &unit, AS
 }
 void FunctionDefinitionNode::addAttribute(FunctionAttribute attribute) { m_attributes.emplace_back(attribute); }
 
-std::optional<FunctionArgument> FunctionDefinitionNode::getParam(const std::string &paramName)
+std::optional<FunctionArgument> FunctionDefinitionNode::getParam(const std::string &paramName) const
 {
     for (auto &param: m_params)
     {
@@ -204,7 +216,7 @@ std::optional<FunctionArgument> FunctionDefinitionNode::getParam(const size_t in
     return std::nullopt;
 }
 
-std::shared_ptr<BlockNode> FunctionDefinitionNode::body() { return m_body; }
+std::shared_ptr<BlockNode> FunctionDefinitionNode::body() const { return m_body; }
 
 
 std::string FunctionDefinitionNode::functionSignature()

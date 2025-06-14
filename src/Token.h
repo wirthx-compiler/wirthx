@@ -57,4 +57,9 @@ struct Token
     Token &operator=(const Token &other) = default;
 
     [[nodiscard]] std::string lexical() const { return sourceLocation.text(); }
+    bool operator==(const Token &other) const
+    {
+        return sourceLocation == other.sourceLocation && row == other.row && col == other.col &&
+               tokenType == other.tokenType;
+    }
 };

@@ -35,6 +35,7 @@ namespace llvm
     class PassManager;
 
     using FunctionPassManager = PassManager<Function, AnalysisManager<Function>>;
+    using ModulePassManager = PassManager<Module, AnalysisManager<Module>>;
     using FunctionAnalysisManager = AnalysisManager<Function>;
     using ModuleAnalysisManager = AnalysisManager<Module>;
 
@@ -65,6 +66,7 @@ struct Context
     std::unique_ptr<llvm::FunctionPassManager> TheFPM;
     std::unique_ptr<llvm::FunctionAnalysisManager> TheFAM;
     std::unique_ptr<llvm::ModuleAnalysisManager> TheMAM;
+    std::unique_ptr<llvm::ModulePassManager> TheMPM;
     std::unique_ptr<llvm::PassInstrumentationCallbacks> ThePIC;
     std::unique_ptr<llvm::StandardInstrumentations> TheSI;
     std::unique_ptr<llvm::Triple> TargetTriple;

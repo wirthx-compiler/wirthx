@@ -213,3 +213,9 @@ void VariableAssignmentNode::typeCheck(const std::unique_ptr<UnitNode> &unit, AS
         }
     }
 }
+bool VariableAssignmentNode::tokenIsPartOfNode(const Token &token) const
+{
+    if (ASTNode::tokenIsPartOfNode(token))
+        return true;
+    return m_expression->tokenIsPartOfNode(token);
+}

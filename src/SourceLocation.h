@@ -17,4 +17,9 @@ struct SourceLocation
         const size_t startPos = lineStart();
         return source->substr(startPos, endPos - startPos);
     }
+
+    bool operator==(const SourceLocation &other) const
+    {
+        return filename == other.filename && byte_offset == other.byte_offset && num_bytes == other.num_bytes;
+    }
 };
