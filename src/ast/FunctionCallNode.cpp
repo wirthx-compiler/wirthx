@@ -190,3 +190,17 @@ std::shared_ptr<VariableType> FunctionCallNode::resolveType(const std::unique_pt
 
 std::string FunctionCallNode::name() { return m_name; }
 void FunctionCallNode::typeCheck(const std::unique_ptr<UnitNode> &unit, ASTNode *parentNode) {}
+bool FunctionCallNode::tokenIsPartOfNode(const Token &token) const
+{
+    if (ASTNode::tokenIsPartOfNode(token))
+        return true;
+
+    for (auto &arg: m_args)
+    {
+        if (arg->tokenIsPartOfNode(token))
+        {
+            return true;
+        }
+    }
+    return false;
+}

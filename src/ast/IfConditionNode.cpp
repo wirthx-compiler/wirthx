@@ -2,6 +2,7 @@
 #include <iostream>
 #include <llvm/IR/IRBuilder.h>
 
+#include "BlockNode.h"
 #include "compiler/Context.h"
 #include "exceptions/CompilerException.h"
 
@@ -141,4 +142,42 @@ void IfConditionNode::typeCheck(const std::unique_ptr<UnitNode> &unit, ASTNode *
     {
         exp->typeCheck(unit, parentNode);
     }
+}
+bool IfConditionNode::tokenIsPartOfNode(const Token &token) const
+{
+    if (m_conditionNode->tokenIsPartOfNode(token))
+        return true;
+
+    for (const auto &node: m_ifExpressions)
+    {
+        if (node->tokenIsPartOfNode(token))
+        {
+            return true;
+        }
+        if (const auto block = std::dynamic_pointer_cast<BlockNode>(node))
+        {
+
+            if (auto result = block->getNodeByToken(token))
+            {
+                return true;
+            }
+        }
+    }
+
+    for (const auto &node: m_elseExpressions)
+    {
+        if (node->tokenIsPartOfNode(token))
+        {
+            return true;
+        }
+        if (const auto block = std::dynamic_pointer_cast<BlockNode>(node))
+        {
+
+            if (auto result = block->getNodeByToken(token))
+            {
+                return true;
+            }
+        }
+    }
+    return false;
 }

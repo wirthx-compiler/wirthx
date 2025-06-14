@@ -21,4 +21,5 @@ public:
     std::string name();
 
     void typeCheck(const std::unique_ptr<UnitNode> &unit, ASTNode *parentNode) override;
+    [[nodiscard]] bool tokenIsPartOfNode(const Token &token) const override;
 };

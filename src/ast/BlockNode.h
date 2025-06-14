@@ -21,10 +21,11 @@ public:
     void setBlockName(const std::string &name);
     void codegenConstantDefinitions(std::unique_ptr<Context> &context);
     llvm::Value *codegen(std::unique_ptr<Context> &context) override;
-    std::optional<VariableDefinition> getVariableDefinition(const std::string &name);
+    std::optional<VariableDefinition> getVariableDefinition(const std::string &name) const;
     void addVariableDefinition(VariableDefinition definition);
     void preappendExpression(std::shared_ptr<ASTNode> node);
     void appendExpression(const std::shared_ptr<ASTNode> &node);
     void typeCheck(const std::unique_ptr<UnitNode> &unit, ASTNode *parentNode) override;
     std::vector<VariableDefinition> getVariableDefinitions();
+    std::optional<std::shared_ptr<ASTNode>> getNodeByToken(const Token &token) const;
 };

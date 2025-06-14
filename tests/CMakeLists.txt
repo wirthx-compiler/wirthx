@@ -58,7 +58,7 @@ macro(package_add_test_with_libraries TESTNAME FILES LIBRARIES TEST_WORKING_DIRE
 endmacro()
 
 
-package_add_test(wirthx_test lexer_test.cpp compiler_test.cpp)
+package_add_test(wirthx_test lexer_test.cpp compiler_test.cpp rtl_tests.cpp)
 add_custom_command(TARGET wirthx_test POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${CMAKE_SOURCE_DIR}/tests/testfiles/ $<TARGET_FILE_DIR:wirthx_test>/testfiles/)
@@ -70,6 +70,11 @@ add_custom_command(TARGET wirthx_test POST_BUILD
 add_custom_command(TARGET wirthx_test POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${CMAKE_SOURCE_DIR}/tests/projecteuler/ $<TARGET_FILE_DIR:wirthx_test>/projecteuler/)
+
+add_custom_command(TARGET wirthx_test POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_SOURCE_DIR}/tests/rtl/ $<TARGET_FILE_DIR:wirthx_test>/rtl/)
+
 
 add_custom_command(TARGET wirthx_test POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_directory

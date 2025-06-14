@@ -148,6 +148,28 @@ llvm::Value *VariableAssignmentNode::codegen(std::unique_ptr<Context> &context)
             return expressionResult;
         }
 
+        if (m_dereference)
+        {
+            const auto expressionType = m_expression->resolveType(context->ProgramUnit, resolveParent(context));
+            const auto dereferenced = context->Builder->CreateLoad(context->Builder->getPtrTy(), allocatedValue,
+                                                                   "deref." + m_variableName);
+            if (expressionType->baseType == VariableBaseType::String)
+            {
+
+                const auto arrayPointerOffset = context->Builder->CreateStructGEP(
+                        expressionType->generateLlvmType(context), expressionResult, 2, "string.ptr.offset");
+                context->Builder->CreateStore(
+                        context->Builder->CreateLoad(llvm::PointerType::getUnqual(*context->TheContext),
+                                                     arrayPointerOffset),
+                        dereferenced);
+            }
+            else
+            {
+                context->Builder->CreateStore(expressionResult, dereferenced);
+            }
+            return expressionResult;
+        }
+
         // auto resultType = m_expression->resolveType(context->ProgramUnit, resolveParent(context));
 
         // expressionResult = context->Builder->CreateLoad(resultType->generateLlvmType(context), expressionResult);
@@ -190,4 +212,10 @@ void VariableAssignmentNode::typeCheck(const std::unique_ptr<UnitNode> &unit, AS
                                                            "\" was assigned."});
         }
     }
+}
+bool VariableAssignmentNode::tokenIsPartOfNode(const Token &token) const
+{
+    if (ASTNode::tokenIsPartOfNode(token))
+        return true;
+    return m_expression->tokenIsPartOfNode(token);
 }

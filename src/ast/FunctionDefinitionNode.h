@@ -9,6 +9,7 @@ struct FunctionArgument
 {
     std::shared_ptr<VariableType> type;
     std::string argumentName;
+    Token token;
     bool isReference;
 };
 
@@ -45,9 +46,9 @@ public:
     std::string &externalName();
     std::string &libName();
     std::shared_ptr<VariableType> returnType();
-    std::optional<FunctionArgument> getParam(const std::string &paramName);
+    std::optional<FunctionArgument> getParam(const std::string &paramName) const;
     std::optional<FunctionArgument> getParam(const size_t index);
-    std::shared_ptr<BlockNode> body();
+    std::shared_ptr<BlockNode> body() const;
     llvm::Value *codegen(std::unique_ptr<Context> &context) override;
 
     void typeCheck(const std::unique_ptr<UnitNode> &unit, ASTNode *parentNode) override;

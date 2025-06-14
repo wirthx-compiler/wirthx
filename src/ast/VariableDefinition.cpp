@@ -99,9 +99,7 @@ llvm::AllocaInst *VariableDefinition::generateCode(std::unique_ptr<Context> &con
         case VariableBaseType::Pointer:
         {
             const auto type = std::dynamic_pointer_cast<PointerType>(this->variableType);
-            if (type->pointerBase)
-                return context->Builder->CreateAlloca(type->pointerBase->generateLlvmType(context), nullptr,
-                                                      this->variableName);
+
             return context->Builder->CreateAlloca(type->generateLlvmType(context), nullptr, this->variableName);
         }
         case VariableBaseType::File:
@@ -144,5 +142,5 @@ llvm::Value *VariableDefinition::generateCodeForConstant(std::unique_ptr<Context
 
     // auto array = std::dynamic_pointer_cast<ArrayType>(this->variableType);
 
-    return this->value->codegen(context);
+    return this->value->codegenForTargetType(context, this->variableType);
 }

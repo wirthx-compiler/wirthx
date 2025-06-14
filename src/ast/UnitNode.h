@@ -38,12 +38,14 @@ public:
 
     std::vector<std::shared_ptr<FunctionDefinitionNode>> getFunctionDefinitions();
     std::optional<std::shared_ptr<FunctionDefinitionNode>> getFunctionDefinition(const std::string &functionName);
+    std::optional<std::shared_ptr<FunctionDefinitionNode>> getFunctionDefinitionByName(const std::string &functionName);
     void addFunctionDefinition(const std::shared_ptr<FunctionDefinitionNode> &functionDefinition);
     std::string getUnitName();
     llvm::Value *codegen(std::unique_ptr<Context> &context) override;
-    std::optional<VariableDefinition> getVariableDefinition(const std::string &name);
+    std::optional<VariableDefinition> getVariableDefinition(const std::string &name) const;
     std::set<std::string> collectLibsToLink();
     std::unordered_map<std::string, std::shared_ptr<VariableType>> getTypeDefinitions();
 
     void typeCheck(const std::unique_ptr<UnitNode> &unit, ASTNode *parentNode) override;
+    std::optional<std::pair<const ASTNode *, std::shared_ptr<ASTNode>>> getNodeByToken(const Token &token) const;
 };

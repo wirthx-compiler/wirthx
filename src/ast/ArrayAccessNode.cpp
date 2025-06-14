@@ -22,26 +22,44 @@ void ArrayAccessNode::print() {}
 
 std::shared_ptr<VariableType> ArrayAccessNode::resolveType(const std::unique_ptr<UnitNode> &unit, ASTNode *parentNode)
 {
-    const auto definition = unit->getVariableDefinition(m_arrayNameToken.lexical());
     std::shared_ptr<VariableType> varType = nullptr;
-    if (!definition)
+
+    if (parentNode)
     {
-        if (const auto functionDefinition = dynamic_cast<FunctionDefinitionNode *>(parentNode))
+        if (auto func = dynamic_cast<FunctionDefinitionNode *>(parentNode))
         {
-            if (const auto param = functionDefinition->getParam(m_arrayNameToken.lexical()))
+            if (const auto param = func->getParam(m_arrayNameToken.lexical()))
             {
                 varType = param.value().type;
             }
-            else if (const auto variableDef =
-                             functionDefinition->body()->getVariableDefinition(m_arrayNameToken.lexical()))
+            else if (const auto variableDef = func->body()->getVariableDefinition(m_arrayNameToken.lexical()))
             {
                 varType = variableDef->variableType;
             }
         }
     }
-    else
+
+    if (!varType)
     {
-        varType = definition->variableType;
+        if (const auto definition = unit->getVariableDefinition(m_arrayNameToken.lexical()); !definition)
+        {
+            if (const auto functionDefinition = dynamic_cast<FunctionDefinitionNode *>(parentNode))
+            {
+                if (const auto param = functionDefinition->getParam(m_arrayNameToken.lexical()))
+                {
+                    varType = param.value().type;
+                }
+                else if (const auto variableDef =
+                                 functionDefinition->body()->getVariableDefinition(m_arrayNameToken.lexical()))
+                {
+                    varType = variableDef->variableType;
+                }
+            }
+        }
+        else
+        {
+            varType = definition->variableType;
+        }
     }
 
     if (varType)

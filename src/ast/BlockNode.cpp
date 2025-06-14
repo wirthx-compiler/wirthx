@@ -50,6 +50,7 @@ llvm::Value *BlockNode::codegen(std::unique_ptr<Context> &context)
 
         // Create a new basic block to start insertion into.
         llvm::BasicBlock *BB = llvm::BasicBlock::Create(*context->TheContext, m_blockname, context->TopLevelFunction);
+
         context->Builder->SetInsertPoint(BB);
     }
     codegenConstantDefinitions(context);
@@ -141,32 +142,30 @@ llvm::Value *BlockNode::codegen(std::unique_ptr<Context> &context)
     return llvm::Constant::getNullValue(llvm::Type::getDoubleTy(*context->TheContext));
 }
 
-std::optional<VariableDefinition> BlockNode::getVariableDefinition(const std::string &name)
+std::optional<VariableDefinition> BlockNode::getVariableDefinition(const std::string &name) const
 {
-    for (auto def: m_variableDefinitions)
+    for (const auto &def: m_variableDefinitions)
     {
-        if (def.variableName == name)
+        if (iequals(def.variableName, name) or iequals(def.alias, name))
         {
             return def;
         }
     }
     for (auto &node: m_expressions)
     {
-        auto block = node->block();
+        const auto block = node->block();
         if (!block)
         {
             continue;
         }
-        if (auto b = std::dynamic_pointer_cast<BlockNode>(block.value()))
+        if (const auto &b = std::dynamic_pointer_cast<BlockNode>(block.value()))
         {
-            auto result = b->getVariableDefinition(name);
-            if (result)
+            if (auto result = b->getVariableDefinition(name))
             {
                 return result;
             }
         }
     }
-
     return std::nullopt;
 }
 
@@ -182,6 +181,25 @@ void BlockNode::typeCheck(const std::unique_ptr<UnitNode> &unit, ASTNode *parent
     }
 }
 std::vector<VariableDefinition> BlockNode::getVariableDefinitions() { return m_variableDefinitions; }
+std::optional<std::shared_ptr<ASTNode>> BlockNode::getNodeByToken(const Token &token) const
+{
+    for (const auto &node: m_expressions)
+    {
+        if (node->tokenIsPartOfNode(token))
+        {
+            return node;
+        }
+        if (const auto block = std::dynamic_pointer_cast<BlockNode>(node))
+        {
+
+            if (auto result = block->getNodeByToken(token))
+            {
+                return result;
+            }
+        }
+    }
+    return std::nullopt;
+}
 
 void BlockNode::preappendExpression(std::shared_ptr<ASTNode> node)
 {

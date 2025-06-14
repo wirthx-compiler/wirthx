@@ -67,6 +67,18 @@ std::optional<std::shared_ptr<FunctionDefinitionNode>> UnitNode::getFunctionDefi
     }
     return std::nullopt;
 }
+std::optional<std::shared_ptr<FunctionDefinitionNode>>
+UnitNode::getFunctionDefinitionByName(const std::string &functionName)
+{
+    for (auto &def: m_functionDefinitions)
+    {
+        if (iequals(def->name(), functionName))
+        {
+            return def;
+        }
+    }
+    return std::nullopt;
+}
 
 void UnitNode::addFunctionDefinition(const std::shared_ptr<FunctionDefinitionNode> &functionDefinition)
 {
@@ -231,6 +243,15 @@ llvm::Value *UnitNode::codegen(std::unique_ptr<Context> &context)
 
     context->Builder->CreateRet(llvm::ConstantInt::get(*context->TheContext, llvm::APInt(32, 0)));
     verifyFunction(*F, &llvm::errs());
+
+    if (!llvm::verifyModule(*context->TheModule, &llvm::errs()))
+    {
+        if (context->compilerOptions.buildMode == BuildMode::Release)
+        {
+            context->TheMPM->run(*context->TheModule, *context->TheMAM);
+        }
+    }
+
     if (context->compilerOptions.buildMode == BuildMode::Release)
     {
         context->TheFPM->run(*F, *context->TheFAM);
@@ -238,9 +259,11 @@ llvm::Value *UnitNode::codegen(std::unique_ptr<Context> &context)
     return nullptr;
 }
 
-std::optional<VariableDefinition> UnitNode::getVariableDefinition(const std::string &name)
+std::optional<VariableDefinition> UnitNode::getVariableDefinition(const std::string &name) const
 {
-    return m_blockNode->getVariableDefinition(name);
+    if (m_blockNode)
+        return m_blockNode->getVariableDefinition(name);
+    return std::nullopt;
 }
 
 std::set<std::string> UnitNode::collectLibsToLink()
@@ -267,4 +290,22 @@ void UnitNode::typeCheck(const std::unique_ptr<UnitNode> &unit, ASTNode *parentN
     }
 
     m_blockNode->typeCheck(unit, parentNode);
+}
+std::optional<std::pair<const ASTNode *, std::shared_ptr<ASTNode>>> UnitNode::getNodeByToken(const Token &token) const
+{
+    if (m_blockNode)
+    {
+        if (auto result = m_blockNode->getNodeByToken(token))
+            return std::pair{dynamic_cast<const ASTNode *>(this), result.value()};
+    }
+    for (const auto &function: m_functionDefinitions)
+    {
+        if (function->body())
+        {
+            if (auto result = function->body()->getNodeByToken(token))
+                return std::pair{dynamic_cast<const ASTNode *>(function.get()), result.value()};
+        }
+    }
+
+    return std::nullopt;
 }

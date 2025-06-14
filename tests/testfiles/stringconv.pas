@@ -1,5 +1,5 @@
 program stringconv;
-
+uses strings;
 var
     strval : string;
     teststr : string = '222311';

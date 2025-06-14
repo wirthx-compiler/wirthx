@@ -6,6 +6,7 @@
 #define LANGUAGESERVER_H
 
 #include <llvm/ADT/StringRef.h>
+#include <llvm/Support/JSON.h>
 #include <map>
 #include <string>
 
@@ -24,7 +25,6 @@ class LanguageServer
 
 public:
     explicit LanguageServer(CompilerOptions options);
-
 
     void handleRequest();
 };

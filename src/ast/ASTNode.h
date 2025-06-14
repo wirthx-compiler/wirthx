@@ -23,6 +23,11 @@ public:
 
     virtual void print() = 0;
     virtual llvm::Value *codegen(std::unique_ptr<Context> &context) = 0;
+    virtual llvm::Value *codegenForTargetType(std::unique_ptr<Context> &context,
+                                              const std::shared_ptr<VariableType> &targetType)
+    {
+        return codegen(context);
+    }
 
     virtual std::shared_ptr<VariableType> resolveType(const std::unique_ptr<UnitNode> &unit, ASTNode *parentNode);
     virtual std::optional<std::shared_ptr<ASTNode>> block() { return std::nullopt; }
@@ -30,4 +35,5 @@ public:
 
     virtual Token expressionToken() { return m_token; }
     static ASTNode *resolveParent(const std::unique_ptr<Context> &context);
+    [[nodiscard]] virtual bool tokenIsPartOfNode(const Token &token) const { return m_token == token; }
 };
