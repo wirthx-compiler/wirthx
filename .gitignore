@@ -4,6 +4,7 @@ build/
 # Jetbrainz
 .cache/
 .idea/
+.vs/
 cmake-build-*
 
 # docs

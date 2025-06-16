@@ -13,7 +13,6 @@ jobs:
             os: windows-latest
             triplet: x64-windows
             arch: x64
-            experimental: true
           # - name: Windows (x86)
           #   os: windows-latest
           #   triplet: x86-windows
