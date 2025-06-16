@@ -8,18 +8,27 @@ The language is named after Nicolaus Wirth the creator of pascal.
 The compiler is based on llvm and will generate a native binary for the target plattform.
 For now only `linux-x86-64` is supported.
 
+## Current Restrictions
+
+- only ascii characters are allowed in the source code
+- no support for `set` types
+- no support for `file` types with a sub type
+- no support for `packed` types
+- no support for `class` or `object` types
+
 ### Options
 
-| **Option** 	   | **Values** 	 | **Description**                                  	 |
-|----------------|--------------|----------------------------------------------------|
-| --run <br>-r 	 | 	            | Runs the compiled program                        	 |
-| --debug    	   | 	            | Creates a debug build                            	 |
-| --release  	   | 	            | Creates a release build                          	 |
-| --rtl      	   | path       	 | sets the path for the rtl (run time library)     	 |
-| --output   	   | path       	 | sets the output / build directory                	 |
-| --llvm-ir  	   | 	            | Outputs the LLVM-IR to the standard error output 	 |
-| --help         |              | Outputs the program help                           |
-| --version      |              | Prints the current version of the compiler         |
+| **Option** 	   | **Values** 	 | **Description**                                  	                        |
+|----------------|--------------|---------------------------------------------------------------------------|
+| --run <br>-r 	 | 	            | Runs the compiled program                        	                        |
+| --debug    	   | 	            | Creates a debug build                            	                        |
+| --release  	   | 	            | Creates a release build                          	                        |
+| --rtl      	   | path       	 | sets the path for the rtl (run time library)     	                        |
+| --output   	   | path       	 | sets the output / build directory                	                        |
+| --llvm-ir  	   | 	            | Outputs the LLVM-IR to the standard error output 	                        |
+| --help         |              | Outputs the program help                                                  |
+| --version      |              | Prints the current version of the compiler                                |
+| --lsp          |              | runs the compiler in the language server mode                           	 |
 
 # Usage
 

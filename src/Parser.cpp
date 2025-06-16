@@ -171,8 +171,12 @@ std::shared_ptr<ASTNode> Parser::parseEscapedString(const Token &token)
         if (next == std::string::npos)
             next = token.sourceLocation.num_bytes;
         auto tmp = token.lexical().substr(x, next - x);
-        result += std::atoi(tmp.data());
+        result += static_cast<char>(std::atoi(tmp.data()));
         x = next + 1;
+    }
+    if (result.size() == 1)
+    {
+        return std::make_shared<CharConstantNode>(token, result);
     }
     return std::make_shared<StringConstantNode>(token, result);
 }
@@ -402,9 +406,9 @@ std::optional<VariableDefinition> Parser::parseConstantDefinition(size_t scope)
 
     // consume var declarations
     consume(TokenType::NAMEDTOKEN);
-    Token varNameToken = current();
+    const Token varNameToken = current();
 
-    auto varName = std::string(current().lexical());
+    const auto varName = std::string(current().lexical());
 
 
     std::optional<std::shared_ptr<VariableType>> type;
@@ -448,8 +452,12 @@ std::optional<VariableDefinition> Parser::parseConstantDefinition(size_t scope)
         return std::nullopt;
     }
 
-    return VariableDefinition{
-            .variableType = type.value(), .variableName = varName, .scopeId = scope, .value = value, .constant = true};
+    return VariableDefinition{.variableType = type.value(),
+                              .variableName = varName,
+                              .token = varNameToken,
+                              .scopeId = scope,
+                              .value = value,
+                              .constant = true};
 }
 std::shared_ptr<ASTNode> Parser::parseArrayConstructor(size_t size)
 {
@@ -473,13 +481,12 @@ std::vector<VariableDefinition> Parser::parseVariableDefinitions(const size_t sc
     // consume var declarations
 
 
-    std::vector<std::string> varNames;
+    std::vector<Token> varNames;
     do
     {
         consume(TokenType::NAMEDTOKEN);
         _currentToken = current();
-        auto varName = std::string(_currentToken.lexical());
-        varNames.push_back(varName);
+        varNames.push_back(_currentToken);
         if (!tryConsume(TokenType::COMMA))
         {
             break;
@@ -540,23 +547,24 @@ std::vector<VariableDefinition> Parser::parseVariableDefinitions(const size_t sc
     consume(TokenType::SEMICOLON);
     for (const auto &varName: varNames)
     {
-        if (isVariableDefined(varName, scope))
+        if (isVariableDefined(varName.lexical(), scope))
         {
             m_errors.push_back(ParserError{.token = _currentToken,
-                                           .message = "A variable or constant with the name " + varName +
+                                           .message = "A variable or constant with the name " + varName.lexical() +
                                                       " was all ready defined!"});
             return {};
         }
         if (!type.has_value())
         {
             m_errors.push_back(ParserError{.token = _currentToken,
-                                           .message = "A type " + varType + " of the variable " + varName +
+                                           .message = "A type " + varType + " of the variable " + varName.lexical() +
                                                       " could not be determined!"});
             return {};
         }
 
         result.push_back(VariableDefinition{.variableType = type.value(),
-                                            .variableName = varName,
+                                            .variableName = varName.lexical(),
+                                            .token = varName,
                                             .scopeId = scope,
                                             .value = value,
                                             .constant = false});
@@ -714,6 +722,13 @@ std::shared_ptr<ASTNode> Parser::parseBaseExpression(const size_t scope, const s
                 consume(TokenType::EQUAL);
                 auto rhs = parseBaseExpression(scope);
                 return std::make_shared<ComparrisionNode>(operatorToken, CMPOperator::LESS_EQUAL, lhs, rhs);
+            }
+            else if (canConsume(TokenType::GREATER))
+            {
+                consume(TokenType::GREATER);
+                auto rhs = parseBaseExpression(scope);
+                return parseExpression(
+                        scope, std::make_shared<ComparrisionNode>(operatorToken, CMPOperator::NOT_EQUALS, lhs, rhs));
             }
             auto rhs = parseBaseExpression(scope);
             return parseExpression(scope,
@@ -1081,13 +1096,13 @@ std::shared_ptr<FunctionDefinitionNode> Parser::parseFunctionDeclaration(size_t 
         }
         token = current();
         const std::string funcParamName = token.lexical();
-        std::vector<std::string> paramNames;
-        paramNames.push_back(funcParamName);
+        std::vector<Token> paramNames;
+        paramNames.push_back(token);
         while (canConsume(TokenType::COMMA))
         {
             consume(TokenType::COMMA);
             consume(TokenType::NAMEDTOKEN);
-            paramNames.emplace_back(current().lexical());
+            paramNames.emplace_back(current());
         }
 
         consume(TokenType::COLON);
@@ -1099,23 +1114,26 @@ std::shared_ptr<FunctionDefinitionNode> Parser::parseFunctionDeclaration(size_t 
             for (const auto &param: paramNames)
             {
 
-                if (isVariableDefined(param, scope))
+                if (isVariableDefined(param.lexical(), scope))
                 {
-                    m_errors.push_back(ParserError{
-                            .token = token, .message = "A variable with the name " + param + " was allready defined!"});
+                    m_errors.push_back(ParserError{.token = token,
+                                                   .message = "A variable with the name " + param.lexical() +
+                                                              " was allready defined!"});
                 }
                 else if (!type.has_value())
                 {
                     m_errors.push_back(ParserError{.token = token,
                                                    .message = "A type " + token.lexical() + " of the variable " +
-                                                              param + " could not be determined!"});
+                                                              param.lexical() + " could not be determined!"});
                 }
                 else
                 {
 
 
-                    functionParams.push_back(
-                            FunctionArgument{.type = type.value(), .argumentName = param, .isReference = isReference});
+                    functionParams.push_back(FunctionArgument{.type = type.value(),
+                                                              .argumentName = param.lexical(),
+                                                              .token = param,
+                                                              .isReference = isReference});
                 }
             }
             tryConsume(TokenType::SEMICOLON);
@@ -1126,8 +1144,10 @@ std::shared_ptr<FunctionDefinitionNode> Parser::parseFunctionDeclaration(size_t 
             std::shared_ptr<VariableType> variableType = FileType::getFileType();
             for (const auto &param: paramNames)
             {
-                functionParams.push_back(
-                        FunctionArgument{.type = variableType, .argumentName = param, .isReference = isReference});
+                functionParams.push_back(FunctionArgument{.type = variableType,
+                                                          .argumentName = param.lexical(),
+                                                          .token = param,
+                                                          .isReference = isReference});
             }
             tryConsume(TokenType::SEMICOLON);
         }
@@ -1216,14 +1236,14 @@ std::shared_ptr<FunctionDefinitionNode> Parser::parseFunctionDefinition(size_t s
             isReference = true;
         }
         token = current();
-        const std::string funcParamName = token.lexical();
-        std::vector<std::string> paramNames;
+        const auto funcParamName = token;
+        std::vector<Token> paramNames;
         paramNames.push_back(funcParamName);
         while (canConsume(TokenType::COMMA))
         {
             consume(TokenType::COMMA);
             consume(TokenType::NAMEDTOKEN);
-            paramNames.emplace_back(current().lexical());
+            paramNames.emplace_back(current());
         }
 
         consume(TokenType::COLON);
@@ -1235,25 +1255,30 @@ std::shared_ptr<FunctionDefinitionNode> Parser::parseFunctionDefinition(size_t s
             for (const auto &param: paramNames)
             {
 
-                if (isVariableDefined(param, scope))
+                if (isVariableDefined(param.lexical(), scope))
                 {
-                    m_errors.push_back(ParserError{
-                            .token = token, .message = "A variable with the name " + param + " was allready defined!"});
+                    m_errors.push_back(ParserError{.token = token,
+                                                   .message = "A variable with the name " + param.lexical() +
+                                                              " was allready defined!"});
                 }
                 else if (!type.has_value())
                 {
                     m_errors.push_back(ParserError{.token = token,
                                                    .message = "A type " + token.lexical() + " of the variable " +
-                                                              param + " could not be determined!"});
+                                                              param.lexical() + " could not be determined!"});
                 }
                 else
                 {
 
-                    m_known_variable_definitions.push_back(
-                            VariableDefinition{.variableType = type.value(), .variableName = param, .scopeId = scope});
+                    m_known_variable_definitions.push_back(VariableDefinition{.variableType = type.value(),
+                                                                              .variableName = param.lexical(),
+                                                                              .token = param,
+                                                                              .scopeId = scope});
 
-                    functionParams.push_back(
-                            FunctionArgument{.type = type.value(), .argumentName = param, .isReference = isReference});
+                    functionParams.push_back(FunctionArgument{.type = type.value(),
+                                                              .argumentName = param.lexical(),
+                                                              .token = param,
+                                                              .isReference = isReference});
                 }
             }
             tryConsume(TokenType::SEMICOLON);
@@ -1262,7 +1287,7 @@ std::shared_ptr<FunctionDefinitionNode> Parser::parseFunctionDefinition(size_t s
         {
             // TODO: type def missing
             m_errors.push_back(ParserError{.token = token,
-                                           .message = "For the parameter definition " + funcParamName +
+                                           .message = "For the parameter definition " + funcParamName.lexical() +
                                                       " there is a type missing"});
         }
 
@@ -1293,10 +1318,12 @@ std::shared_ptr<FunctionDefinitionNode> Parser::parseFunctionDefinition(size_t s
             returnType = type.value();
         }
 
-        m_known_variable_definitions.push_back(
-                VariableDefinition{.variableType = returnType, .variableName = functionName, .scopeId = scope});
-        m_known_variable_definitions.push_back(
-                VariableDefinition{.variableType = returnType, .variableName = "result", .scopeId = scope});
+        m_known_variable_definitions.push_back(VariableDefinition{.variableType = returnType,
+                                                                  .variableName = functionName,
+                                                                  .token = functionNameToken,
+                                                                  .scopeId = scope});
+        m_known_variable_definitions.push_back(VariableDefinition{
+                .variableType = returnType, .variableName = "result", .token = functionNameToken, .scopeId = scope});
     }
     consume(TokenType::SEMICOLON);
 
@@ -1334,6 +1361,7 @@ std::shared_ptr<FunctionDefinitionNode> Parser::parseFunctionDefinition(size_t s
         {
             functionBody->addVariableDefinition(VariableDefinition{.variableType = returnType,
                                                                    .variableName = functionName,
+                                                                   .token = functionNameToken,
                                                                    .alias = "result",
                                                                    .scopeId = 0,
                                                                    .value = nullptr,
@@ -1523,8 +1551,7 @@ std::shared_ptr<ASTNode> Parser::parseKeyword(size_t scope, bool withSemicolon)
             }
             return std::make_shared<ForEachNode>(forToken, loopVariableToken, loopExpression, forNodes);
         }
-        // m_known_variable_definitions.push_back(VariableDefinition{
-        //         .variableType = VariableType::getInteger(64), .variableName = loopVariable, .scopeId = scope + 1});
+
         consume(TokenType::COLON);
         consume(TokenType::EQUAL);
         auto loopStart = parseBaseExpression(scope + 1);
@@ -1717,16 +1744,13 @@ bool Parser::importUnit(const Token &token, const std::string &filename, bool in
         file.open(path, std::ios::in);
         if (!file.is_open())
         {
-            m_errors.push_back(ParserError{.token = token, .message = filename + " is not a valid unit"});
-            m_errors.push_back(ParserError{.token = token, .message = filename + " is not a valid pascal file"});
-
-
+            m_errors.push_back(ParserError{.token = token, .message = path.string() + " is not a valid unit"});
             return true;
         }
         std::stringstream buffer;
         buffer << file.rdbuf();
         Lexer lexer;
-        auto tokens = lexer.tokenize(filename, buffer.str());
+        auto tokens = lexer.tokenize(path.string(), buffer.str());
         MacroParser macroParser(m_definitions);
         Parser parser(m_rtlDirectories, path, m_definitions, macroParser.parseFile(tokens));
         auto unit = parser.parseUnit(includeSystem);
@@ -1973,8 +1997,10 @@ std::unique_ptr<UnitNode> Parser::parseProgram()
                 consume(TokenType::NAMEDTOKEN);
                 auto paramName = current().lexical();
                 paramNames.emplace_back(paramName);
-                m_known_variable_definitions.push_back(VariableDefinition{
-                        .variableType = FileType::getFileType(), .variableName = paramName, .scopeId = 0});
+                m_known_variable_definitions.push_back(VariableDefinition{.variableType = FileType::getFileType(),
+                                                                          .variableName = paramName,
+                                                                          .token = current(),
+                                                                          .scopeId = 0});
                 tryConsume(TokenType::COMMA);
             }
             consume(TokenType::RIGHT_CURLY);

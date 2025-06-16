@@ -85,7 +85,8 @@ llvm::Value *ArrayAssignmentNode::codegen(std::unique_ptr<Context> &context)
             if (!arrayDef)
             {
                 const auto param = functionDef.value()->getParam(m_variableName);
-                variableType = param.value().type;
+                if (param)
+                    variableType = param.value().type;
             }
         }
     }
@@ -160,6 +161,20 @@ llvm::Value *ArrayAssignmentNode::codegen(std::unique_ptr<Context> &context)
 
         const auto loadResult =
                 context->Builder->CreateLoad(llvm::PointerType::getUnqual(*context->TheContext), arrayPointerOffset);
+
+
+        const auto bounds =
+                context->Builder->CreateGEP(arrayBaseType, loadResult, llvm::ArrayRef<llvm::Value *>{index}, "", true);
+
+        context->Builder->CreateStore(result, bounds);
+    }
+
+    if (const auto ptrType = std::dynamic_pointer_cast<PointerType>(variableType))
+    {
+        const auto arrayBaseType = ptrType->pointerBase->generateLlvmType(context);
+
+
+        const auto loadResult = context->Builder->CreateLoad(llvm::PointerType::getUnqual(*context->TheContext), V);
 
 
         const auto bounds =

@@ -13,9 +13,8 @@ StringConstantNode::StringConstantNode(const Token &token, const std::string &li
 
 void StringConstantNode::print() { std::cout << "\'" << m_literal << "\'"; }
 
-llvm::Value *StringConstantNode::codegen(std::unique_ptr<Context> &context)
+llvm::GlobalVariable *StringConstantNode::generateConstant(std::unique_ptr<Context> &context, std::string &result) const
 {
-    std::string result;
 
     bool isEscape = false;
     for (size_t i = 0; i < m_literal.size(); ++i)
@@ -50,12 +49,20 @@ llvm::Value *StringConstantNode::codegen(std::unique_ptr<Context> &context)
             result += m_literal[i];
         }
     }
-    const auto varType = StringType::getString();
-    const auto llvmRecordType = varType->generateLlvmType(context);
 
-    const auto constant = context->Builder->CreateGlobalString(result, ".str", 0, context->TheModule.get());
+
+    auto resultVar = context->Builder->CreateGlobalString(result, ".str", 0, context->TheModule.get());
+    resultVar->setLinkage(llvm::GlobalValue::PrivateLinkage);
+    return resultVar;
+}
+llvm::Value *StringConstantNode::codegen(std::unique_ptr<Context> &context)
+{
+    std::string result;
+    llvm::GlobalVariable *const constant = generateConstant(context, result);
     if (context->TopLevelFunction)
     {
+        const auto varType = StringType::getString();
+        const auto llvmRecordType = varType->generateLlvmType(context);
         const auto stringAlloc = context->Builder->CreateAlloca(llvmRecordType, nullptr, "string_constant");
 
 
@@ -78,6 +85,20 @@ llvm::Value *StringConstantNode::codegen(std::unique_ptr<Context> &context)
         return stringAlloc;
     }
     return constant;
+}
+llvm::Value *StringConstantNode::codegenForTargetType(std::unique_ptr<Context> &context,
+                                                      const std::shared_ptr<VariableType> &targetType)
+{
+    if (targetType->baseType == VariableBaseType::String)
+    {
+        return codegen(context);
+    }
+    else if (targetType->baseType == VariableBaseType::Pointer)
+    {
+        std::string result;
+        return generateConstant(context, result);
+    }
+    return LogErrorV("cannot convert string constant to target type");
 }
 
 std::shared_ptr<VariableType> StringConstantNode::resolveType([[maybe_unused]] const std::unique_ptr<UnitNode> &unit,

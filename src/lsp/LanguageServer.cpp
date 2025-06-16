@@ -14,6 +14,8 @@
 #include "Lexer.h"
 #include "MacroParser.h"
 #include "Parser.h"
+#include "ast/VariableAccessNode.h"
+#include "ast/VariableAssignmentNode.h"
 
 
 LanguageServer::LanguageServer(CompilerOptions options) : m_options(std::move(options)) {}
@@ -170,6 +172,37 @@ void parseAndSendDiagnostics(std::vector<std::filesystem::path> rtlDirectories, 
     }
     sentDiagnostics(errorsMap);
 }
+llvm::json::Object buildLocationFromToken(const Token &expressionToken)
+{
+    llvm::json::Object location;
+    auto filePath = expressionToken.sourceLocation.filename;
+    if (filePath.starts_with("file://"))
+    {
+        location["uri"] = filePath;
+    }
+    else
+    {
+        location["uri"] = "file://" + filePath;
+    }
+    llvm::json::Object range;
+    range["start"] = buildPosition(expressionToken.row, expressionToken.col);
+    range["end"] = buildPosition(expressionToken.row, expressionToken.col + expressionToken.sourceLocation.num_bytes);
+    location["range"] = std::move(range);
+    return location;
+}
+llvm::json::Object buildError(const char *message, const int errorCode)
+{
+    llvm::json::Object error;
+    error["code"] = errorCode;
+    error["message"] = message;
+    error["data"] = "An internal error occurred while processing the request.";
+    return error;
+}
+bool tokenInRange(const Token &token, size_t line, size_t character)
+{
+    return token.row == line + 1 && character + 1 >= token.col &&
+           character + 1 <= token.col + token.sourceLocation.num_bytes;
+}
 void LanguageServer::handleRequest()
 {
     std::vector<std::string> logMessages;
@@ -207,7 +240,7 @@ void LanguageServer::handleRequest()
             try
             {
                 std::string resultString;
-
+                std::cerr << "command: " << commandString << std::endl;
                 logMessages.push_back("method: " + method.value().str());
                 llvm::raw_string_ostream sstream(resultString);
                 llvm::json::Object response;
@@ -237,12 +270,15 @@ void LanguageServer::handleRequest()
                     capabilities["colorProvider"] = false;
                     llvm::json::Object diagnosticProvider;
                     diagnosticProvider["interFileDependencies"] = true;
-                    diagnosticProvider["workspaceDiagnostics"] = true;
+                    diagnosticProvider["workspaceDiagnostics"] = false;
                     capabilities["diagnosticProvider"] = std::move(diagnosticProvider);
                     llvm::json::Object textDocumentSync;
                     textDocumentSync["openClose"] = true;
                     textDocumentSync["change"] = 1;
                     capabilities["textDocumentSync"] = std::move(textDocumentSync);
+                    capabilities["declarationProvider"] = true;
+                    capabilities["definitionProvider"] = true;
+
                     result["capabilities"] = std::move(capabilities);
 
                     llvm::json::Object completionProvider;
@@ -313,20 +349,112 @@ void LanguageServer::handleRequest()
                 }
                 else if (method.value() == "textDocument/documentColor")
                 {
-                    auto params = requestObject->getObject("params");
-                    auto uri = params->getObject("textDocument")->getString("uri");
-                    auto &document = m_openDocuments.at(uri.value().str());
-                    Lexer lexer;
-                    auto tokens = lexer.tokenize(uri.value().str(), document.text);
+                    // auto params = requestObject->getObject("params");
+                    //  auto uri = params->getObject("textDocument")->getString("uri");
+
+
                     llvm::json::Array array;
 
                     response["result"] = std::move(array);
+                }
+                else if (method.value() == "textDocument/definition")
+                {
+                    auto params = requestObject->getObject("params");
+                    auto uri = params->getObject("textDocument")->getString("uri");
+                    auto position = params->getObject("position");
+                    size_t line = position->getInteger("line").value();
+                    size_t character = position->getInteger("character").value();
+                    auto &document = m_openDocuments.at(uri.value().str());
+                    std::filesystem::path filePath = uri.value().str();
+
+                    Lexer lexer;
+                    auto tokens = lexer.tokenize(filePath.string(), document.text);
+                    std::unordered_map<std::string, bool> definitions;
+
+                    MacroParser macro_parser(definitions);
+                    Parser parser(this->m_options.rtlDirectories, filePath, definitions,
+                                  macro_parser.parseFile(tokens));
+                    auto ast = parser.parseFile();
+                    bool found = false;
+                    for (auto &token: tokens)
+                    {
+                        if (tokenInRange(token, line, character + 1))
+                        {
+
+
+                            if (token.tokenType == TokenType::NAMEDTOKEN)
+                            {
+                                auto resultPair = ast->getNodeByToken(token);
+                                if (resultPair.has_value())
+                                {
+                                    std::cerr << " node found for token: " << token.lexical() << "\n";
+
+                                    auto [parent, node] = resultPair.value();
+                                    if (const auto function = dynamic_cast<const FunctionDefinitionNode *>(parent))
+                                    {
+                                        if (auto varDefinition =
+                                                    function->body()->getVariableDefinition(token.lexical()))
+                                        {
+                                            std::cerr << "Found variable definition: " << varDefinition->token.lexical()
+                                                      << "\n";
+
+                                            llvm::json::Object location = buildLocationFromToken(varDefinition->token);
+                                            response["result"] = std::move(location);
+                                            found = true;
+                                            break;
+                                        }
+                                        if (auto param = function->getParam(token.lexical()); param.has_value())
+                                        {
+
+                                            llvm::json::Object location = buildLocationFromToken(param->token);
+                                            response["result"] = std::move(location);
+                                            found = true;
+                                            break;
+                                        }
+                                    }
+                                    else if (auto unit = dynamic_cast<const UnitNode *>(parent))
+                                    {
+                                        if (auto varDefinition = unit->getVariableDefinition(token.lexical()))
+                                        {
+                                            std::cerr << "Found variable definition: " << varDefinition->token.lexical()
+                                                      << "\n";
+
+                                            llvm::json::Object location = buildLocationFromToken(varDefinition->token);
+                                            response["result"] = std::move(location);
+                                            found = true;
+                                            break;
+                                        }
+                                    }
+                                }
+
+                                if (auto functionDefinition = ast->getFunctionDefinitionByName(token.lexical()))
+                                {
+
+                                    auto expressionToken = functionDefinition.value()->expressionToken();
+                                    llvm::json::Object location = buildLocationFromToken(expressionToken);
+                                    response["result"] = std::move(location);
+                                    found = true;
+                                    break;
+                                }
+                            }
+                            else
+                            {
+                                std::cerr << "unsupported token type \n";
+                            }
+                        }
+                        if (found)
+                            break;
+                    }
+                    if (!found)
+                    {
+                        response["error"] = buildError("No definition found for token at position", -32603);
+                    }
                 }
                 else
                 {
                     std::cerr << "unsupported method: " << method.value().str() << "\n";
                     logMessages.push_back("unsupported method: " + method.value().str());
-                    continue;
+                    response["error"] = buildError("Method not found", -32601);
                 }
 
                 if (hasId)
@@ -335,7 +463,7 @@ void LanguageServer::handleRequest()
                     sstream << resultValue;
                     std::cout << "Content-Length: " << sstream.str().length() << "\r\n\r\n";
                     std::cout << sstream.str();
-                    std::cerr << sstream.str();
+                    std::cerr << "response: " << sstream.str() + "\n";
                 }
             }
             catch (...)

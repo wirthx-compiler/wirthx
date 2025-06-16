@@ -29,7 +29,10 @@
 #include "llvm/Target/TargetOptions.h"
 #include "llvm/TargetParser/Host.h"
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
+#include "llvm/Transforms/IPO/GlobalDCE.h"
+#include "llvm/Transforms/IPO/PartialInlining.h"
 #include "llvm/Transforms/InstCombine/InstCombine.h"
+#include "llvm/Transforms/Scalar/DCE.h"
 #include "llvm/Transforms/Scalar/GVN.h"
 #include "llvm/Transforms/Scalar/MemCpyOptimizer.h"
 #include "llvm/Transforms/Scalar/Reassociate.h"
@@ -51,6 +54,7 @@ std::unique_ptr<Context> InitializeModule(std::unique_ptr<UnitNode> &unit, const
     context->Builder = std::make_unique<llvm::IRBuilder<>>(*context->TheContext);
     // Create new pass and analysis managers.
     context->TheFPM = std::make_unique<llvm::FunctionPassManager>();
+    context->TheMPM = std::make_unique<llvm::ModulePassManager>();
     const auto TheLAM = std::make_unique<llvm::LoopAnalysisManager>();
     context->TheFAM = std::make_unique<llvm::FunctionAnalysisManager>();
     const auto TheCGAM = std::make_unique<llvm::CGSCCAnalysisManager>();
@@ -79,6 +83,20 @@ std::unique_ptr<Context> InitializeModule(std::unique_ptr<UnitNode> &unit, const
         context->TheFPM->addPass(llvm::LoopSimplifyPass());
 
         context->TheFPM->addPass(llvm::MemCpyOptPass());
+
+        context->TheFPM->addPass(llvm::DCEPass());
+        context->TheMPM->addPass(llvm::AlwaysInlinerPass());
+
+
+        context->TheMPM->addPass(llvm::PartialInlinerPass());
+        context->TheMPM->addPass(llvm::ModuleInlinerPass());
+        context->TheMPM->addPass(llvm::GlobalDCEPass());
+
+        // how do i remove unused functions?
+
+
+        context->TheMPM->addPass(llvm::createModuleToFunctionPassAdaptor(
+                llvm::DCEPass())); // Remove dead functions and global variables.
     }
 
 

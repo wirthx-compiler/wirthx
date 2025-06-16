@@ -57,7 +57,8 @@ llvm::Value *VariableAccessNode::codegen(std::unique_ptr<Context> &context)
         return LogErrorV("Unknown variable name: " + m_variableName);
     }
 
-    // if (m_dereference)
+    // auto type = resolveType(context->ProgramUnit, resolveParent(context));
+    // if (!m_dereference && type->baseType == VariableBaseType::Pointer)
     // {
     //     return A;
     // }
