@@ -15,5 +15,5 @@ llvm::Value *CharConstantNode::codegen(std::unique_ptr<Context> &context)
 
 std::shared_ptr<VariableType> CharConstantNode::resolveType(const std::unique_ptr<UnitNode> &unit, ASTNode *parentNode)
 {
-    return VariableType::getInteger(8);
+    return VariableType::getCharacter();
 }

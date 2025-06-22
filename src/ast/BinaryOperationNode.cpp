@@ -91,8 +91,8 @@ llvm::Value *BinaryOperationNode::generateForFloat(llvm::Value *lhs, llvm::Value
     return nullptr;
 }
 
-llvm::Value *BinaryOperationNode::generateForStringPlusInteger(llvm::Value *lhs, llvm::Value *rhs,
-                                                               std::unique_ptr<Context> &context)
+llvm::Value *BinaryOperationNode::generateForStringPlusChar(llvm::Value *lhs, llvm::Value *rhs,
+                                                            std::unique_ptr<Context> &context)
 {
     const auto varType = StringType::getString();
     const auto valueType = VariableType::getInteger(8)->generateLlvmType(context);
@@ -278,17 +278,17 @@ llvm::Value *BinaryOperationNode::codegen(std::unique_ptr<Context> &context)
             {
                 case VariableBaseType::String:
                     return generateForString(lhs, rhs, context);
-                case VariableBaseType::Integer:
-                    return generateForStringPlusInteger(lhs, rhs, context);
+                case VariableBaseType::Character:
+                    return generateForStringPlusChar(lhs, rhs, context);
                 default:
-                    assert(false && "unknown variable type for binary opteration");
+                    assert(false && "unknown variable type for binary operation");
                     break;
             }
         case VariableBaseType::Double:
         case VariableBaseType::Float:
             return generateForFloat(lhs, rhs, context);
         default:
-            assert(false && "unknown variable type for binary opteration");
+            assert(false && "unknown variable type for binary operation");
             break;
     }
 
@@ -310,7 +310,7 @@ void BinaryOperationNode::typeCheck(const std::unique_ptr<UnitNode> &unit, ASTNo
     {
         if (*lhsType != *rhsType)
         {
-            if (not(lhsType->baseType == VariableBaseType::String && rhsType->baseType == VariableBaseType::Integer))
+            if (not(lhsType->baseType == VariableBaseType::String && rhsType->baseType == VariableBaseType::Character))
             {
                 throw CompilerException(ParserError{
                         .token = m_operatorToken,

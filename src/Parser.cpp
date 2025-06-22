@@ -51,7 +51,7 @@ Parser::Parser(const std::vector<std::filesystem::path> &rtlDirectories, std::fi
 {
     m_typeDefinitions["shortint"] = VariableType::getInteger(8);
     m_typeDefinitions["byte"] = VariableType::getInteger(8);
-    m_typeDefinitions["char"] = VariableType::getInteger(8);
+    m_typeDefinitions["char"] = VariableType::getCharacter();
     m_typeDefinitions["smallint"] = VariableType::getInteger(16);
     m_typeDefinitions["word"] = VariableType::getInteger(16);
     m_typeDefinitions["longint"] = VariableType::getInteger();

@@ -7,6 +7,7 @@
 enum class VariableBaseType
 {
     Integer,
+    Character,
     Float,
     Double,
     String,
@@ -43,6 +44,7 @@ public:
 
     virtual llvm::Type *generateLlvmType(std::unique_ptr<Context> &context);
     static std::shared_ptr<IntegerType> getInteger(size_t length = 32);
+    static std::shared_ptr<VariableType> getCharacter();
     static std::shared_ptr<VariableType> getSingle();
     static std::shared_ptr<VariableType> getDouble();
     static std::shared_ptr<VariableType> getBoolean();

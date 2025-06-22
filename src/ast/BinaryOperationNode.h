@@ -28,7 +28,7 @@ public:
     ~BinaryOperationNode() override = default;
 
     void print() override;
-    llvm::Value *generateForStringPlusInteger(llvm::Value *lhs, llvm::Value *rhs, std::unique_ptr<Context> &context);
+    llvm::Value *generateForStringPlusChar(llvm::Value *lhs, llvm::Value *rhs, std::unique_ptr<Context> &context);
     llvm::Value *codegen(std::unique_ptr<Context> &context) override;
     std::shared_ptr<VariableType> resolveType(const std::unique_ptr<UnitNode> &unit, ASTNode *parentNode) override;
 

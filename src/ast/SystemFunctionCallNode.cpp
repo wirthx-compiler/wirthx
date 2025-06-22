@@ -232,7 +232,7 @@ llvm::Value *SystemFunctionCallNode::codegen_write(std::unique_ptr<Context> &con
         {
             continue;
         }
-        else if (auto rangeType = std::dynamic_pointer_cast<ValueRangeType>(type))
+        else if (const auto rangeType = std::dynamic_pointer_cast<ValueRangeType>(type))
         {
             if (context->TargetTriple->getOS() == llvm::Triple::Win32)
             {
@@ -257,7 +257,7 @@ llvm::Value *SystemFunctionCallNode::codegen_write(std::unique_ptr<Context> &con
         }
         else if (const auto ptrType = std::dynamic_pointer_cast<PointerType>(type))
         {
-            if (*(ptrType->pointerBase) == *(VariableType::getInteger(8)))
+            if (*(ptrType->pointerBase) == *(VariableType::getCharacter()))
             {
                 ArgsV.push_back(context->Builder->CreateGlobalString("%s", "format_string"));
                 // const auto value =
@@ -268,6 +268,11 @@ llvm::Value *SystemFunctionCallNode::codegen_write(std::unique_ptr<Context> &con
             {
                 assert(false && "type can not be printed");
             }
+        }
+        else if (type->baseType == VariableBaseType::Character)
+        {
+            ArgsV.push_back(context->Builder->CreateGlobalString("%c", "format_char"));
+            ArgsV.push_back(argValue);
         }
         else
         {
