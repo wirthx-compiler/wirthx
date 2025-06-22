@@ -39,6 +39,7 @@ public:
     explicit VariableType(VariableBaseType baseType = VariableBaseType::Unknown, const std::string &typeName = "");
     virtual ~VariableType() = default;
     [[nodiscard]] bool isSimpleType() const;
+    [[nodiscard]] bool isNumberType() const;
     VariableBaseType baseType = VariableBaseType::Unknown;
     std::string typeName = "";
 

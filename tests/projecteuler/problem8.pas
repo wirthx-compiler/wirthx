@@ -20,7 +20,7 @@ begin
                 break;
             if input[current] = '0' then
                 break;
-            t := input[current] - '0';
+            t := ord(input[current]) - ord('0');
 
             temp := temp * t;
         end;

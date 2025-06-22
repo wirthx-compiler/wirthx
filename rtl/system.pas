@@ -105,7 +105,7 @@ uses ctypes;
         if result = 0 then
             for idx := 0 to max do
             begin
-                tmp := S1[idx] - S2[idx];
+                tmp := ord(S1[idx]) - ord(S2[idx]);
                 if tmp != 0 then
                 begin
                     result := tmp;
@@ -168,7 +168,7 @@ uses ctypes;
                 factor := -1
             else if (S[i] >= '0') and (S[i] <= '9') then
             begin
-                t2 := S[i] - '0';
+                t2 := ord(S[i]) - ord('0');
                 tmp := tmp + base * t2;
                 base:= base * 10;
             end

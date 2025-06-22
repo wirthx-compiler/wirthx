@@ -260,8 +260,6 @@ llvm::Value *SystemFunctionCallNode::codegen_write(std::unique_ptr<Context> &con
             if (*(ptrType->pointerBase) == *(VariableType::getCharacter()))
             {
                 ArgsV.push_back(context->Builder->CreateGlobalString("%s", "format_string"));
-                // const auto value =
-                //         context->Builder->CreateLoad(llvm::PointerType::getUnqual(*context->TheContext), argValue);
                 ArgsV.push_back(argValue);
             }
             else
@@ -465,6 +463,11 @@ llvm::Value *SystemFunctionCallNode::codegen(std::unique_ptr<Context> &context)
         const auto argValue = m_args[0]->codegen(context);
         return argValue;
     }
+    else if (iequals(m_name, "chr"))
+    {
+        const auto argValue = m_args[0]->codegen(context);
+        return argValue;
+    }
     else if (iequals(m_name, "strdispose"))
     {
         const auto argValue = m_args[0]->codegen(context);
@@ -498,11 +501,15 @@ std::shared_ptr<VariableType> SystemFunctionCallNode::resolveType(const std::uni
     }
     if (iequals(m_name, "pchar"))
     {
-        return PointerType::getPointerTo(IntegerType::getInteger(8));
+        return PointerType::getPointerTo(IntegerType::getCharacter());
     }
     if (iequals(m_name, "ord"))
     {
         return IntegerType::getInteger(32);
+    }
+    if (iequals(m_name, "chr"))
+    {
+        return IntegerType::getCharacter();
     }
 
     return nullptr;

@@ -19,6 +19,7 @@ bool VariableType::isSimpleType() const
             return false;
         case VariableBaseType::Pointer:
         case VariableBaseType::Integer:
+        case VariableBaseType::Character:
         case VariableBaseType::Float:
         case VariableBaseType::Double:
         case VariableBaseType::Boolean:
@@ -26,6 +27,18 @@ bool VariableType::isSimpleType() const
             return true;
         default:
             assert(false && "unknown base type to generate llvm type for");
+            return false;
+    }
+}
+bool VariableType::isNumberType() const
+{
+    switch (this->baseType)
+    {
+        case VariableBaseType::Integer:
+        case VariableBaseType::Float:
+        case VariableBaseType::Double:
+            return true;
+        default:
             return false;
     }
 }

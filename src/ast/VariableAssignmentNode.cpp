@@ -212,6 +212,8 @@ void VariableAssignmentNode::typeCheck(const std::unique_ptr<UnitNode> &unit, AS
                                                            "\" was assigned."});
         }
     }
+
+    m_expression->typeCheck(unit, parentNode);
 }
 bool VariableAssignmentNode::tokenIsPartOfNode(const Token &token) const
 {
