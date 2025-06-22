@@ -232,7 +232,7 @@ llvm::Value *SystemFunctionCallNode::codegen_write(std::unique_ptr<Context> &con
         {
             continue;
         }
-        else if (auto rangeType = std::dynamic_pointer_cast<ValueRangeType>(type))
+        else if (const auto rangeType = std::dynamic_pointer_cast<ValueRangeType>(type))
         {
             if (context->TargetTriple->getOS() == llvm::Triple::Win32)
             {
@@ -257,17 +257,20 @@ llvm::Value *SystemFunctionCallNode::codegen_write(std::unique_ptr<Context> &con
         }
         else if (const auto ptrType = std::dynamic_pointer_cast<PointerType>(type))
         {
-            if (*(ptrType->pointerBase) == *(VariableType::getInteger(8)))
+            if (*(ptrType->pointerBase) == *(VariableType::getCharacter()))
             {
                 ArgsV.push_back(context->Builder->CreateGlobalString("%s", "format_string"));
-                // const auto value =
-                //         context->Builder->CreateLoad(llvm::PointerType::getUnqual(*context->TheContext), argValue);
                 ArgsV.push_back(argValue);
             }
             else
             {
                 assert(false && "type can not be printed");
             }
+        }
+        else if (type->baseType == VariableBaseType::Character)
+        {
+            ArgsV.push_back(context->Builder->CreateGlobalString("%c", "format_char"));
+            ArgsV.push_back(argValue);
         }
         else
         {
@@ -460,6 +463,11 @@ llvm::Value *SystemFunctionCallNode::codegen(std::unique_ptr<Context> &context)
         const auto argValue = m_args[0]->codegen(context);
         return argValue;
     }
+    else if (iequals(m_name, "chr"))
+    {
+        const auto argValue = m_args[0]->codegen(context);
+        return argValue;
+    }
     else if (iequals(m_name, "strdispose"))
     {
         const auto argValue = m_args[0]->codegen(context);
@@ -493,11 +501,15 @@ std::shared_ptr<VariableType> SystemFunctionCallNode::resolveType(const std::uni
     }
     if (iequals(m_name, "pchar"))
     {
-        return PointerType::getPointerTo(IntegerType::getInteger(8));
+        return PointerType::getPointerTo(IntegerType::getCharacter());
     }
     if (iequals(m_name, "ord"))
     {
         return IntegerType::getInteger(32);
+    }
+    if (iequals(m_name, "chr"))
+    {
+        return IntegerType::getCharacter();
     }
 
     return nullptr;

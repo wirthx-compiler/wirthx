@@ -91,8 +91,8 @@ llvm::Value *BinaryOperationNode::generateForFloat(llvm::Value *lhs, llvm::Value
     return nullptr;
 }
 
-llvm::Value *BinaryOperationNode::generateForStringPlusInteger(llvm::Value *lhs, llvm::Value *rhs,
-                                                               std::unique_ptr<Context> &context)
+llvm::Value *BinaryOperationNode::generateForStringPlusChar(llvm::Value *lhs, llvm::Value *rhs,
+                                                            std::unique_ptr<Context> &context)
 {
     const auto varType = StringType::getString();
     const auto valueType = VariableType::getInteger(8)->generateLlvmType(context);
@@ -278,17 +278,17 @@ llvm::Value *BinaryOperationNode::codegen(std::unique_ptr<Context> &context)
             {
                 case VariableBaseType::String:
                     return generateForString(lhs, rhs, context);
-                case VariableBaseType::Integer:
-                    return generateForStringPlusInteger(lhs, rhs, context);
+                case VariableBaseType::Character:
+                    return generateForStringPlusChar(lhs, rhs, context);
                 default:
-                    assert(false && "unknown variable type for binary opteration");
+                    assert(false && "unknown variable type for binary operation");
                     break;
             }
         case VariableBaseType::Double:
         case VariableBaseType::Float:
             return generateForFloat(lhs, rhs, context);
         default:
-            assert(false && "unknown variable type for binary opteration");
+            assert(false && "unknown variable type for binary operation");
             break;
     }
 
@@ -306,11 +306,12 @@ std::shared_ptr<VariableType> BinaryOperationNode::resolveType(const std::unique
 }
 void BinaryOperationNode::typeCheck(const std::unique_ptr<UnitNode> &unit, ASTNode *parentNode)
 {
-    if (const auto lhsType = m_lhs->resolveType(unit, parentNode); auto rhsType = m_rhs->resolveType(unit, parentNode))
+    if (const auto lhsType = m_lhs->resolveType(unit, parentNode);
+        const auto rhsType = m_rhs->resolveType(unit, parentNode))
     {
         if (*lhsType != *rhsType)
         {
-            if (not(lhsType->baseType == VariableBaseType::String && rhsType->baseType == VariableBaseType::Integer))
+            if (not(lhsType->baseType == VariableBaseType::String && rhsType->baseType == VariableBaseType::Character))
             {
                 throw CompilerException(ParserError{
                         .token = m_operatorToken,
@@ -318,12 +319,21 @@ void BinaryOperationNode::typeCheck(const std::unique_ptr<UnitNode> &unit, ASTNo
                                    "\" is not possible because the types are not the same"});
             }
         }
+        else if ((!lhsType->isNumberType() or !rhsType->isNumberType()) and
+                 (lhsType->baseType != VariableBaseType::String and rhsType->baseType != VariableBaseType::String))
+        {
+            throw CompilerException(ParserError{
+                    .token = m_operatorToken,
+                    .message = "the binary operation of \"" + lhsType->typeName + "\" and \"" + rhsType->typeName +
+                               "\" is not possible because the types can not be used in a binary operation"});
+        }
     }
 }
 Token BinaryOperationNode::expressionToken()
 {
-    auto start = m_lhs->expressionToken().sourceLocation.byte_offset;
-    auto end = m_rhs->expressionToken().sourceLocation.byte_offset + m_rhs->expressionToken().sourceLocation.num_bytes;
+    const auto start = m_lhs->expressionToken().sourceLocation.byte_offset;
+    const auto end =
+            m_rhs->expressionToken().sourceLocation.byte_offset + m_rhs->expressionToken().sourceLocation.num_bytes;
     Token token = ASTNode::expressionToken();
     token.sourceLocation.num_bytes = end - start;
     token.sourceLocation.byte_offset = start;

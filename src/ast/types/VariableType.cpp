@@ -19,6 +19,7 @@ bool VariableType::isSimpleType() const
             return false;
         case VariableBaseType::Pointer:
         case VariableBaseType::Integer:
+        case VariableBaseType::Character:
         case VariableBaseType::Float:
         case VariableBaseType::Double:
         case VariableBaseType::Boolean:
@@ -26,6 +27,18 @@ bool VariableType::isSimpleType() const
             return true;
         default:
             assert(false && "unknown base type to generate llvm type for");
+            return false;
+    }
+}
+bool VariableType::isNumberType() const
+{
+    switch (this->baseType)
+    {
+        case VariableBaseType::Integer:
+        case VariableBaseType::Float:
+        case VariableBaseType::Double:
+            return true;
+        default:
             return false;
     }
 }
@@ -42,19 +55,28 @@ llvm::Type *VariableType::generateLlvmType(std::unique_ptr<Context> &context)
             return llvm::Type::getDoubleTy(*context->TheContext);
         case VariableBaseType::Boolean:
             return llvm::Type::getInt1Ty(*context->TheContext);
+        case VariableBaseType::Character:
+            return llvm::Type::getInt8Ty(*context->TheContext);
         default:
             assert(false && "unknown base type to generate llvm type for");
             return nullptr;
     }
 }
 
-std::shared_ptr<IntegerType> VariableType::getInteger(size_t length)
+std::shared_ptr<IntegerType> VariableType::getInteger(const size_t length)
 {
     auto integer = std::make_shared<IntegerType>();
     integer->baseType = VariableBaseType::Integer;
     integer->length = length;
     integer->typeName = "integer" + std::to_string(length);
     return integer;
+}
+std::shared_ptr<VariableType> VariableType::getCharacter()
+{
+    auto charType = std::make_shared<VariableType>();
+    charType->baseType = VariableBaseType::Character;
+    charType->typeName = "char";
+    return charType;
 }
 std::shared_ptr<VariableType> VariableType::getSingle()
 {

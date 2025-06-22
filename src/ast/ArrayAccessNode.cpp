@@ -67,7 +67,7 @@ std::shared_ptr<VariableType> ArrayAccessNode::resolveType(const std::unique_ptr
         if (const auto array = std::dynamic_pointer_cast<ArrayType>(varType))
             return array->arrayBase;
         if (auto array = std::dynamic_pointer_cast<StringType>(varType))
-            return IntegerType::getInteger(8);
+            return IntegerType::getCharacter();
     }
     return std::make_shared<VariableType>();
 }
