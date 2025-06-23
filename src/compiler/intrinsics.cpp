@@ -38,6 +38,29 @@ void createSystemCall(std::unique_ptr<Context> &context, const std::string &func
     }
 }
 
+void createReAllocCall(const std::unique_ptr<Context> &context)
+{
+    std::vector<llvm::Type *> params;
+    params.push_back(llvm::PointerType::getUnqual(*context->TheContext));
+    params.push_back(llvm::Type::getInt64Ty(*context->TheContext));
+
+    llvm::Type *resultType = llvm::PointerType::getUnqual(*context->TheContext);
+    llvm::FunctionType *functionType = llvm::FunctionType::get(resultType, params, false);
+    llvm::Function *F =
+            llvm::Function::Create(functionType, llvm::Function::ExternalLinkage, "realloc", context->TheModule.get());
+    F->setMemoryEffects(llvm::MemoryEffects::argMemOnly());
+    F->addFnAttr(llvm::Attribute::WillReturn);
+    F->addFnAttr(llvm::Attribute::NoFree);
+
+    F->getArg(0)->setName("ptr");
+    F->getArg(1)->setName("new_size");
+    // F->getArg(0)->addAttr(llvm::Attribute::NullPointerIsValid);
+    F->getArg(0)->addAttr(llvm::Attribute::NoUndef);
+    F->getArg(1)->addAttr(llvm::Attribute::NoUndef);
+    // F->getArg(1)->addAttr(llvm::Attribute::AllocSize);
+}
+
+
 void createPrintfCall(const std::unique_ptr<Context> &context)
 {
     std::vector<llvm::Type *> params;

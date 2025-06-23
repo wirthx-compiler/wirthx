@@ -18,9 +18,18 @@ llvm::AllocaInst *VariableDefinition::generateCode(std::unique_ptr<Context> &con
 
         auto arrayAllocation = context->Builder->CreateAlloca(arrayType, nullptr, this->variableName);
 
-
         if (array->isDynArray)
         {
+            const auto arraySizeOffset =
+                    context->Builder->CreateStructGEP(arrayType, arrayAllocation, 0, "array.size.offset");
+            const auto arrayPointerOffset =
+                    context->Builder->CreateStructGEP(arrayType, arrayAllocation, 1, "array.ptr.offset");
+            context->Builder->CreateStore(context->Builder->getInt64(0), arraySizeOffset);
+            context->Builder->CreateStore(llvm::ConstantPointerNull::get(llvm::PointerType::getUnqual(
+                                                  array->arrayBase->generateLlvmType(context))),
+                                          arrayPointerOffset);
+
+
             return arrayAllocation;
         }
 

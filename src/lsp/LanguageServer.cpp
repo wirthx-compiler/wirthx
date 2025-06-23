@@ -333,20 +333,20 @@ void LanguageServer::handleRequest()
                                                                   uri = uri.value(), text = text.value()]()
                                              { parseAndSendDiagnostics(rtlDirectories, uri, text); });
                 }
-                else if (method.value() == "textDocument/documentHighlight")
-                {
-                    std::cerr << " command: " << commandString << "\n";
-
-                    auto params = requestObject->getObject("params");
-                    auto uri = params->getObject("textDocument")->getString("uri");
-                    auto &document = m_openDocuments.at(uri.value().str());
-                    Lexer lexer;
-                    auto tokens = lexer.tokenize(uri.value().str(), document.text);
-                    llvm::json::Array array;
-
-
-                    response["result"] = std::move(array);
-                }
+                // else if (method.value() == "textDocument/documentHighlight")
+                // {
+                //     std::cerr << " command: " << commandString << "\n";
+                //
+                //     auto params = requestObject->getObject("params");
+                //     auto uri = params->getObject("textDocument")->getString("uri");
+                //     auto &document = m_openDocuments.at(uri.value().str());
+                //     Lexer lexer;
+                //     auto tokens = lexer.tokenize(uri.value().str(), document.text);
+                //     llvm::json::Array array;
+                //
+                //
+                //     response["result"] = std::move(array);
+                // }
                 else if (method.value() == "textDocument/documentColor")
                 {
                     // auto params = requestObject->getObject("params");
@@ -357,6 +357,93 @@ void LanguageServer::handleRequest()
 
                     response["result"] = std::move(array);
                 }
+                else if (method.value() == "textDocument/diagnostic")
+                {
+                    auto uri = requestObject->getObject("params")->getObject("textDocument")->getString("uri").value();
+                    std::map<std::string, std::vector<ParserError>> errorsMap;
+                    Lexer lexer;
+                    std::stringstream text;
+                    if (m_openDocuments.contains(uri.str()))
+                    {
+                        text << m_openDocuments.at(uri.str()).text;
+                        auto tokens = lexer.tokenize(uri.str(), text.str());
+                        std::filesystem::path filePath = uri.str();
+                        std::unordered_map<std::string, bool> definitions;
+                        MacroParser macro_parser(definitions);
+                        Parser parser(this->m_options.rtlDirectories, filePath, definitions,
+                                      macro_parser.parseFile(tokens));
+                        auto ast = parser.parseFile();
+                        if (!parser.hasMessages())
+                        {
+                            errorsMap[filePath.string()] = {};
+                        }
+                        else
+                        {
+                            for (auto &error: parser.getErrors())
+                            {
+                                errorsMap[error.token.sourceLocation.filename].push_back(error);
+                            }
+                        }
+                        llvm::json::Array diagnosticValues;
+                        llvm::json::Object relatedDocuments;
+
+                        for (auto &[fileName, messsages]: errorsMap)
+                        {
+                            llvm::json::Array logMessages;
+                            for (const auto &[outputType, token, message]: messsages)
+                            {
+                                llvm::json::Object logMessage;
+                                llvm::json::Object range;
+                                range["start"] = buildPosition(token.row, token.col);
+                                range["end"] = buildPosition(token.row, token.col + token.sourceLocation.num_bytes);
+                                logMessage["range"] = std::move(range);
+                                logMessage["severity"] = mapOutputTypeToSeverity(outputType);
+                                logMessage["message"] = message;
+                                llvm::json::Array relatedInformations;
+                                llvm::json::Object source;
+                                llvm::json::Object location;
+                                location["uri"] = token.sourceLocation.filename;
+                                llvm::json::Object range2;
+                                range2["start"] = buildPosition(token.row, token.col);
+                                range2["end"] = buildPosition(token.row, token.col + token.sourceLocation.num_bytes);
+                                location["range"] = std::move(range2);
+                                source["location"] = std::move(location);
+                                source["message"] = message;
+                                source["source"] = "wirthx";
+                                relatedInformations.push_back(std::move(source));
+
+                                logMessage["relatedInformation"] = std::move(relatedInformations);
+                                logMessages.push_back(std::move(logMessage));
+                            }
+                            if (fileName == uri.str())
+                            {
+
+                                for (auto msg: logMessages)
+                                    diagnosticValues.push_back(std::move(msg));
+                                logMessages.clear();
+                            }
+                            else
+                            {
+                                llvm::json::Object diagnosticsReport;
+                                diagnosticsReport["kind"] = "full";
+                                diagnosticsReport["items"] = std::move(logMessages);
+
+                                relatedDocuments[fileName] = std::move(diagnosticsReport);
+                            }
+                        }
+                        llvm::json::Object diagnosticsReport;
+                        diagnosticsReport["kind"] = "full";
+                        diagnosticsReport["items"] = std::move(diagnosticValues);
+                        diagnosticsReport["relatedDocuments"] = std::move(relatedDocuments);
+                        response["result"] = std::move(diagnosticsReport);
+                    }
+                    else
+                    {
+                        std::cerr << "Document not found for uri: " << uri.str() << "\n";
+                        response["error"] = buildError("Document not found", -32603);
+                    }
+                }
+
                 else if (method.value() == "textDocument/definition")
                 {
                     auto params = requestObject->getObject("params");

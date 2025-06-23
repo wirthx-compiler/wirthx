@@ -58,14 +58,15 @@ llvm::Value *SystemFunctionCallNode::codegen_setlength(std::unique_ptr<Context> 
         const auto llvmRecordType = realType->generateLlvmType(context);
 
 
-        // auto ptrType = llvm::PointerType::getUnqual(arrayBaseType);
+        auto ptrType = llvm::PointerType::getUnqual(arrayBaseType);
 
         const auto arraySizeOffset = context->Builder->CreateStructGEP(llvmRecordType, value, 0, "array.size.offset");
 
 
         const auto arrayPointerOffset = context->Builder->CreateStructGEP(llvmRecordType, value, 1, "array.ptr.offset");
-        // auto arrayPointer =
-        //         context->Builder->CreateAlignedLoad(arrayBaseType, arrayPointerOffset, alignment, "array.ptr");
+        const llvm::DataLayout &DL = context->TheModule->getDataLayout();
+        const auto alignment = DL.getPrefTypeAlign(arrayBaseType);
+        auto arrayPointer = context->Builder->CreateAlignedLoad(ptrType, arrayPointerOffset, alignment, "array.ptr");
         if (64 != newSize->getType()->getIntegerBitWidth())
         {
             newSize = context->Builder->CreateIntCast(newSize, indexType, true, "lhs_cast");
@@ -78,22 +79,56 @@ llvm::Value *SystemFunctionCallNode::codegen_setlength(std::unique_ptr<Context> 
 
         const auto allocSize = context->Builder->CreateMul(
                 newSize, context->Builder->getInt64(arrayBaseType->getPrimitiveSizeInBits()));
-        llvm::Value *allocCall =
-                context->Builder->CreateMalloc(indexType, //
-                                               arrayBaseType, // Type of elements
-                                               allocSize, // Number of elements
-                                               nullptr // Optional array size multiplier (nullptr for scalar allocation)
-                );
-        const llvm::DataLayout &DL = context->TheModule->getDataLayout();
 
-        const auto alignment = DL.getPrefTypeAlign(arrayBaseType);
 
-        context->Builder->CreateMemSet(allocCall, //
-                                       context->Builder->getInt8(0), // Number of elements
-                                       allocSize, // Optional array size multiplier (nullptr for scalar
-                                       alignment //
+        const auto condition = context->Builder->CreateCmp(
+                llvm::CmpInst::ICMP_EQ, arrayPointer,
+                llvm::ConstantPointerNull::get(llvm::PointerType::getUnqual(*context->TheContext)));
+
+        codegen::codegen_ifelseexpr(
+                context, condition,
+                [indexType, arrayBaseType, allocSize, alignment,
+                 arrayPointerOffset](const std::unique_ptr<Context> &ctx)
+                {
+                    llvm::Value *allocCall = ctx->Builder->CreateMalloc(
+                            indexType, //
+                            arrayBaseType, // Type of elements
+                            allocSize, // Number of elements
+                            nullptr // Optional array size multiplier (nullptr for scalar allocation)
+                    );
+
+                    ctx->Builder->CreateMemSet(allocCall, //
+                                               ctx->Builder->getInt8(0), // Number of elements
+                                               allocSize, // Optional array size multiplier (nullptr for scalar
+                                               alignment //
+                    );
+                    ctx->Builder->CreateStore(allocCall, arrayPointerOffset);
+                    ctx->Builder->CreateLifetimeStart(allocCall);
+                },
+                [arrayPointerOffset, arrayPointer, newSize, arrayBaseType](const std::unique_ptr<Context> &ctx)
+                {
+                    const auto reallocFunc = ctx->TheModule->getFunction("realloc");
+                    if (!reallocFunc)
+                    {
+                        LogErrorV("the function realloc was not found");
+                        return;
+                    }
+                    std::vector<llvm::Value *> ArgsV;
+
+                    ArgsV.push_back(arrayPointer);
+                    ArgsV.push_back(
+                            ctx->Builder->CreateMul(newSize,
+                                                    ctx->Builder->getInt64(arrayBaseType->getPrimitiveSizeInBits() /
+                                                                           8))); // Number of elements);
+                    const auto reallocCall = ctx->Builder->CreateCall(reallocFunc, ArgsV);
+                    ctx->Builder->CreateStore(reallocCall, arrayPointerOffset);
+                    ctx->Builder->CreateLifetimeStart(reallocCall);
+                }
+
+
         );
-        return context->Builder->CreateStore(allocCall, arrayPointerOffset);
+
+        return nullptr;
     }
     if (arrayType->baseType == VariableBaseType::String)
     {

@@ -22,7 +22,7 @@ void BlockNode::print()
         std::cout << def.variableName << " : " << def.variableType->typeName << ";\n";
     }
     std::cout << "begin\n";
-    for (auto exp: m_expressions)
+    for (const auto &exp: m_expressions)
     {
         exp->print();
     }
@@ -120,18 +120,19 @@ llvm::Value *BlockNode::codegen(std::unique_ptr<Context> &context)
     for (auto &def: m_variableDefinitions)
     {
 
-        if (def.variableType->baseType == VariableBaseType::String)
-        {
-            // auto stringStructPtr = context->NamedAllocations[def.variableName];
-            // auto type = def.variableType;
-            // const auto arrayPointerOffset = context->Builder->CreateStructGEP(type->generateLlvmType(context),
-            //                                                                   stringStructPtr, 2,
-            //                                                                   "string.ptr.offset");
-            // auto strValuePtr = context->Builder->CreateLoad(llvm::PointerType::getUnqual(*context->TheContext),
-            //                                                 arrayPointerOffset);
-
-            // context->Builder->CreateCall(context->TheModule->getFunction("free"), strValuePtr);
-        }
+        // if (def.variableType->baseType == VariableBaseType::String)
+        // {
+        //     auto stringStructPtr = context->NamedAllocations[def.variableName];
+        //     auto type = def.variableType;
+        //     const auto arrayPointerOffset = context->Builder->CreateStructGEP(type->generateLlvmType(context),
+        //                                                                       stringStructPtr, 2,
+        //                                                                       "string.ptr.offset");
+        //     // auto strValuePtr = context->Builder->CreateLoad(llvm::PointerType::getUnqual(*context->TheContext),
+        //     //                                                 arrayPointerOffset);
+        //
+        //     // context->Builder->CreateCall(context->TheModule->getFunction("free"), strValuePtr);
+        //     context->Builder->CreateLifetimeEnd(arrayPointerOffset); // End lifetime for the string allocation
+        // }
 
         if (!context->TopLevelFunction || !iequals(def.variableName, topLevelFunctionName))
         {

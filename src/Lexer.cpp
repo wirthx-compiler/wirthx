@@ -60,10 +60,11 @@ constexpr bool validNameChar(const char value) { return validStartNameChar(value
 std::vector<Token> Lexer::tokenize(const std::string &filename, const std::string &content)
 {
     std::vector<Token> tokens;
+    tokens.reserve(1000); // reserve space for 1000 tokens, this is a guess, but should be enough for most files
 
     size_t row = 1;
     size_t column = 1;
-    auto contentPtr = std::make_shared<std::string>(content);
+    const auto contentPtr = std::make_shared<std::string>(content);
     bool parseMacros = false;
     for (size_t i = 0; i < content.size(); ++i)
     {
@@ -402,7 +403,7 @@ bool Lexer::find_fixed_token(const std::string &content, const size_t start, siz
         current = content[*endPosition];
     }
 
-    const auto tmp = content.substr(start, *endPosition - start);
+    const auto tmp = std::string_view(content.data() + start, *endPosition - start);
     return std::ranges::any_of(possible_tokens, [tmp](const std::string &token) { return iequals(tmp, token); });
 }
 

@@ -396,10 +396,7 @@ std::shared_ptr<ArrayType> Parser::parseArray(size_t scope)
     {
         return ArrayType::getFixedArray(arrayStart, arrayEnd, internalType.value());
     }
-    else
-    {
-        return ArrayType::getDynArray(internalType.value());
-    }
+    return ArrayType::getDynArray(internalType.value());
 }
 std::optional<VariableDefinition> Parser::parseConstantDefinition(size_t scope)
 {
