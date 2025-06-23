@@ -216,6 +216,7 @@ void compile_file(const CompilerOptions &options, const std::filesystem::path &i
                       {FunctionArgument{.type = pCharType, .argumentName = "modes"}}},
                      ::PointerType::getUnqual());
 
+    createReAllocCall(context);
     createSystemCall(context, "fclose", {FunctionArgument{.type = ::PointerType::getUnqual(), .argumentName = "file"}},
                      intType);
     // ssize_t getline(char **lineptr, size_t *n, FILE *stream);
