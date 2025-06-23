@@ -1750,8 +1750,8 @@ bool Parser::importUnit(const Token &token, const std::string &filename, bool in
         auto tokens = lexer.tokenize(path.string(), buffer.str());
         MacroParser macroParser(m_definitions);
         Parser parser(m_rtlDirectories, path, m_definitions, macroParser.parseFile(tokens));
-        auto unit = parser.parseUnit(includeSystem);
-        unitCache[path.string()] = std::move(unit);
+        if (auto unit = parser.parseUnit(includeSystem))
+            unitCache[path.string()] = std::move(unit);
         for (auto &error: parser.m_errors)
         {
             m_errors.push_back(error);

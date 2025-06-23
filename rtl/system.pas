@@ -128,7 +128,7 @@ uses ctypes;
 
         while tmp > 0 do
         begin
-            buffer[i] := tmp mod 10 + '0';
+            buffer[i] := chr(tmp mod 10 + ord('0'));
             tmp := tmp div 10;
             inc(i);
         end;

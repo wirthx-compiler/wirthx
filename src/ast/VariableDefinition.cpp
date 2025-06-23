@@ -109,8 +109,18 @@ llvm::AllocaInst *VariableDefinition::generateCode(std::unique_ptr<Context> &con
             const auto stringType = std::dynamic_pointer_cast<StringType>(this->variableType);
             if (stringType != nullptr)
             {
-                return context->Builder->CreateAlloca(stringType->generateLlvmType(context), nullptr,
-                                                      this->variableName);
+                const auto llvmType = stringType->generateLlvmType(context);
+                const auto allocated = context->Builder->CreateAlloca(llvmType, nullptr, this->variableName);
+
+                const auto arraySizeOffset =
+                        context->Builder->CreateStructGEP(llvmType, allocated, 1, "string.size.offset");
+                const auto arrayPointerOffset =
+                        context->Builder->CreateStructGEP(llvmType, allocated, 2, "string.ptr.offset");
+                context->Builder->CreateStore(context->Builder->getInt64(0), arraySizeOffset);
+                context->Builder->CreateStore(
+                        llvm::ConstantPointerNull::get(llvm::PointerType::getUnqual(*context->TheContext)),
+                        arrayPointerOffset);
+                return allocated;
             }
         }
         case VariableBaseType::Pointer:
