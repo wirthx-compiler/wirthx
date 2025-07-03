@@ -195,6 +195,13 @@ void ComparrisionNode::typeCheck(const std::unique_ptr<UnitNode> &unit, ASTNode 
     const auto rhsType = m_rhs->resolveType(unit, parentNode);
     if (*lhsType != *rhsType)
     {
+        if (lhsType->baseType == VariableBaseType::Double || lhsType->baseType == VariableBaseType::Float)
+        {
+            if (rhsType->baseType == VariableBaseType::Double || rhsType->baseType == VariableBaseType::Float)
+            {
+                return;
+            }
+        }
         throw CompilerException(ParserError{.token = m_operatorToken,
                                             .message = "the comparison of \"" + lhsType->typeName + "\" and \"" +
                                                        rhsType->typeName +
