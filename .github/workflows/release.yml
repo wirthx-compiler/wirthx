@@ -75,7 +75,7 @@ jobs:
         run: |
           set -eux
           curl -fL --retry 3 --max-time 300 -o llvm.7z \
-            https://github.com/vovkos/llvm-package-windows/releases/download/llvm-18.1.8/llvm-18.1.8-windows-amd64-msvc17-msvcrt-dbg.7z
+            https://github.com/vovkos/llvm-package-windows/releases/download/llvm-18.1.8/llvm-18.1.8-windows-amd64-msvc17-msvcrt.7z
           mkdir llvm
           cd llvm
           7z x ../llvm.7z >/dev/null
@@ -112,7 +112,7 @@ jobs:
       - name: version linux
         run: echo "version=$(cat ${{ env.CMAKE_BUILD_DIR }}/VERSION.TXT)" >> $GITHUB_OUTPUT
         id: version-linux
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.triplet == 'x64-linux'
       - name: version windows
         working-directory: build
         run: |
@@ -134,8 +134,8 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            ${{ env.CMAKE_BUILD_DIR }}/wirthx-${{ steps.version-linux.outputs.version }}-${{matrix.arch}}.deb
-            ${{ env.CMAKE_BUILD_DIR }}/wirthx-${{ steps.version-linux.outputs.version }}-${{matrix.arch}}.tar.gz
+            ${{ env.CMAKE_BUILD_DIR }}/wirthx_${{ steps.version-linux.outputs.version }}_${{matrix.arch}}.deb
+            ${{ env.CMAKE_BUILD_DIR }}/wirthx_${{ steps.version-linux.outputs.version }}_${{matrix.arch}}.tar.gz
           token: ${{ github.token }}
         env:
           GITHUB_REPOSITORY: wirthx-compiler/wirthx
