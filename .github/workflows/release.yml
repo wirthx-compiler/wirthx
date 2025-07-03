@@ -8,6 +8,8 @@ jobs:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     continue-on-error: ${{ matrix.experimental }}
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
