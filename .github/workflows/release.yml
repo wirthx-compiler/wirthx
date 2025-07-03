@@ -30,13 +30,13 @@ jobs:
             cxx: g++
             arch: amd64
             experimental: false
-          - name: Ubuntu (Clang)
-            os: ubuntu-24.04
-            triplet: x64-linux
-            cc: clang-18
-            cxx: clang++-18
-            arch: amd64
-            experimental: false
+    #          - name: Ubuntu (Clang)
+    #            os: ubuntu-24.04
+    #            triplet: x64-linux
+    #            cc: clang-18
+    #            cxx: clang++-18
+    #            arch: amd64
+    #            experimental: false
 
     env:
       # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
@@ -135,7 +135,7 @@ jobs:
         with:
           files: |
             ${{ env.CMAKE_BUILD_DIR }}/wirthx_${{ steps.version-linux.outputs.version }}_${{matrix.arch}}.deb
-            ${{ env.CMAKE_BUILD_DIR }}/wirthx_${{ steps.version-linux.outputs.version }}_${{matrix.arch}}.tar.gz
+            ${{ env.CMAKE_BUILD_DIR }}/wirthx-${{ steps.version-linux.outputs.version }}-Linux.tar.gz
           token: ${{ github.token }}
         env:
           GITHUB_REPOSITORY: wirthx-compiler/wirthx
@@ -147,5 +147,6 @@ jobs:
           token: ${{ github.token }}
         env:
           GITHUB_REPOSITORY: wirthx-compiler/wirthx
-        if: matrix.triplet == 'x64-linux'
+        if: matrix.os == 'windows-latest'
+
   
