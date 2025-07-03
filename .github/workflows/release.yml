@@ -146,7 +146,7 @@ jobs:
       - name: upload windows artifact (zip)
         uses: softprops/action-gh-release@v1
         with:
-          files: ${{ env.WIN_OUT_DIR }}\wirthx-${{ steps.version-windows.outputs.version }}-${{matrix.winarch}}.zip
+          files: ${{ env.WIN_OUT_DIR }}wirthx-${{ steps.version-windows.outputs.version }}-${{matrix.winarch}}.zip
           token: ${{ github.token }}
         env:
           GITHUB_REPOSITORY: wirthx-compiler/wirthx
