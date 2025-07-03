@@ -61,10 +61,10 @@ uses ctypes;
 
     procedure freemem(var F: PChar);inline;
     begin
-        if F != 0 then
+        if F != nil then
         begin
             cfree(F);
-            F := 0;
+            F := nil;
         end;
     end;
 

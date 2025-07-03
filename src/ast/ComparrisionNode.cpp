@@ -207,8 +207,8 @@ std::shared_ptr<VariableType> ComparrisionNode::resolveType(const std::unique_pt
 }
 Token ComparrisionNode::expressionToken()
 {
-    auto start = m_lhs->expressionToken().sourceLocation.byte_offset;
-    auto end = m_rhs->expressionToken().sourceLocation.byte_offset;
+    const auto start = m_lhs->expressionToken().sourceLocation.byte_offset;
+    const auto end = m_rhs->expressionToken().sourceLocation.byte_offset;
     if (start == end)
         return m_operatorToken;
     Token token = ASTNode::expressionToken();

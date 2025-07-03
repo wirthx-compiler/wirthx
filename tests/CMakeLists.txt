@@ -24,7 +24,7 @@ message(${SRC})
 macro(package_add_test TESTNAME)
     #INCLUDE_DIRECTORIES()
 
-    include_directories(${PROJECT_SOURCE_DIR}/src/ ${LLVM_INCLUDE_DIRS} ${PROJECT_BINARY_DIR})
+    include_directories(${PROJECT_SOURCE_DIR}/src/ ${LLVM_INCLUDE_DIRS})
     # create an exectuable in which the tests will be stored
     add_executable(${TESTNAME} ${TEST_SRC} ${ARGN})
     # link the Google test infrastructure, mocking library, and a default main fuction to

@@ -26,6 +26,7 @@
 #include "ast/IfConditionNode.h"
 #include "ast/LogicalExpressionNode.h"
 #include "ast/MinusNode.h"
+#include "ast/NilPointerNode.h"
 #include "ast/NumberNode.h"
 #include "ast/RepeatUntilNode.h"
 #include "ast/StringConstantNode.h"
@@ -1040,6 +1041,10 @@ std::shared_ptr<ASTNode> Parser::parseToken(const size_t scope)
     if (tryConsumeKeyWord("false"))
     {
         return std::make_shared<BooleanNode>(current(), false);
+    }
+    if (tryConsumeKeyWord("nil"))
+    {
+        return std::make_shared<NilPointerNode>(current());
     }
     if (canConsume(TokenType::MINUS) && canConsume(TokenType::NAMEDTOKEN, 2))
     {

@@ -125,6 +125,7 @@ llvm::Value *IfConditionNode::codegen(std::unique_ptr<Context> &context)
 }
 void IfConditionNode::typeCheck(const std::unique_ptr<UnitNode> &unit, ASTNode *parentNode)
 {
+    m_conditionNode->typeCheck(unit, parentNode);
     const auto conditionType = m_conditionNode->resolveType(unit, parentNode);
     if (conditionType->baseType != VariableBaseType::Boolean)
     {
