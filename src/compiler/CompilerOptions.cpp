@@ -61,6 +61,9 @@ CompilerOptions parseCompilerOptions(std::vector<std::string> &argList)
             break;
         }
     }
+#ifdef WIRTHX_PATH
+    options.rtlDirectories.emplace_back(WIRTHX_PATH + "/rtl"s);
+#endif
 
     if (const char *env_p = std::getenv("WIRTHX_PATH"))
     {

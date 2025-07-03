@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.8)
+cmake_minimum_required(VERSION 3.10)
 
 project(wirthx VERSION 0.1 DESCRIPTION "wirthx is a pascal interpreter and in future compiler")
 
@@ -29,6 +29,9 @@ endif ()
 set(WIRTHX_VERSION_MAJOR 0)
 set(WIRTHX_VERSION_MINOR 1)
 set(WIRTHX_VERSION_PATCH 0)
+add_compile_definitions(WIRTHX_PATH="${WIRTHX_PATH}")
+
+file(WRITE "${PROJECT_BINARY_DIR}/VERSION.TXT" "${WIRTHX_VERSION_MAJOR}.${WIRTHX_VERSION_MINOR}.${WIRTHX_VERSION_PATCH}")
 
 # configure a header file to pass some of the CMake settings
 # to the source code
@@ -149,3 +152,37 @@ if (${CMAKE_CXX_COMPILER_ID} STREQUAL "MSVC")
             MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif ()
 target_link_libraries(${PROJECT_NAME} ${llvm_libs})
+
+include(InstallRequiredSystemLibraries)
+set(CPACK_PACKAGE_NAME "wirthx")
+set(CPACK_PACKAGE_VENDOR "hisoka999")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "wirthx is a pascal compiler and language server")
+set(CPACK_PACKAGE_VERSION_MAJOR ${WIRTHX_VERSION_MAJOR})
+set(CPACK_PACKAGE_VERSION_MINOR ${WIRTHX_VERSION_MINOR})
+set(CPACK_PACKAGE_VERSION_PATCH ${WIRTHX_VERSION_PATCH})
+set(CPACK_PACKAGE_CONTACT "hisoka999@gmail.com")
+set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
+
+
+# Windows ZIP-Paket
+set(CPACK_GENERATOR "ZIP")
+if (WIN32)
+    set(CPACK_GENERATOR "ZIP")
+endif ()
+
+# Linux DEB-Paket
+if (UNIX AND NOT APPLE)
+    set(CPACK_GENERATOR "DEB")
+    set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
+    set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Stefan Lüdtke <hisoka999@gmail.com>")
+    set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6 (>= 2.27) , binutils, gcc")
+    set(CPACK_DEBIAN_PACKAGE_SECTION "devel")
+    set(CPACK_DEBIAN_PACKAGE_HOMEPAGE "https://wirthx-compiler.github.io/")
+
+endif ()
+
+install(TARGETS ${PROJECT_NAME} DESTINATION bin)
+install(DIRECTORY rtl/ DESTINATION include/wirthx/rtl/)
+
+
+include(CPack)
