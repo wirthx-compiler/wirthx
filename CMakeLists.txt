@@ -172,7 +172,7 @@ endif ()
 
 # Linux DEB-Paket
 if (UNIX AND NOT APPLE)
-    set(CPACK_GENERATOR "DEB")
+    SET(CPACK_GENERATOR "DEB;TGZ")
     set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
     set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Stefan Lüdtke <hisoka999@gmail.com>")
     set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6 (>= 2.27) , binutils, gcc")
