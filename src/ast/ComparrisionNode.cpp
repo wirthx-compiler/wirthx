@@ -195,6 +195,13 @@ void ComparrisionNode::typeCheck(const std::unique_ptr<UnitNode> &unit, ASTNode 
     const auto rhsType = m_rhs->resolveType(unit, parentNode);
     if (*lhsType != *rhsType)
     {
+        if (lhsType->baseType == VariableBaseType::Double || lhsType->baseType == VariableBaseType::Float)
+        {
+            if (rhsType->baseType == VariableBaseType::Double || rhsType->baseType == VariableBaseType::Float)
+            {
+                return;
+            }
+        }
         throw CompilerException(ParserError{.token = m_operatorToken,
                                             .message = "the comparison of \"" + lhsType->typeName + "\" and \"" +
                                                        rhsType->typeName +
@@ -207,8 +214,8 @@ std::shared_ptr<VariableType> ComparrisionNode::resolveType(const std::unique_pt
 }
 Token ComparrisionNode::expressionToken()
 {
-    auto start = m_lhs->expressionToken().sourceLocation.byte_offset;
-    auto end = m_rhs->expressionToken().sourceLocation.byte_offset;
+    const auto start = m_lhs->expressionToken().sourceLocation.byte_offset;
+    const auto end = m_rhs->expressionToken().sourceLocation.byte_offset;
     if (start == end)
         return m_operatorToken;
     Token token = ASTNode::expressionToken();

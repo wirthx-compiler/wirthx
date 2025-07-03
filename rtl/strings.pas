@@ -258,8 +258,8 @@ implementation
         if L < 0 then
             size := 0;
         stralloc := malloc(size + 1); //TODO fix typecast
-        //if stralloc <> nil then
-        stralloc[L] := #0; // Null-terminate the string
+        if stralloc <> nil then
+            stralloc[L] := #0; // Null-terminate the string
     end;
 
     function AnsiCompareStr(
