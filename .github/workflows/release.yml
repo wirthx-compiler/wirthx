@@ -45,6 +45,7 @@ jobs:
       BUILD_TYPE: Release
       # Indicates the CMake build directory where project files and binaries are being produced.
       CMAKE_BUILD_DIR: ${{ github.workspace }}/build/
+      WIN_OUT_DIR: ${{ github.workspace }}\build\
       # Indicates the location of the vcpkg as a Git submodule of the project repository.
       #VCPKG_ROOT: ${{ github.workspace }}/vcpkg
       LLVM_DIR: "${{ github.workspace }}/llvm"
@@ -145,7 +146,7 @@ jobs:
       - name: upload windows artifact (zip)
         uses: softprops/action-gh-release@v1
         with:
-          files: ${{ env.CMAKE_BUILD_DIR }}/wirthx-${{ steps.version-windows.outputs.version }}-${{matrix.winarch}}.zip
+          files: ${{ env.WIN_OUT_DIR }}\wirthx-${{ steps.version-windows.outputs.version }}-${{matrix.winarch}}.zip
           token: ${{ github.token }}
         env:
           GITHUB_REPOSITORY: wirthx-compiler/wirthx
