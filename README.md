@@ -1,20 +1,21 @@
 # wirthx
 
 Wirthx is an experimental pascal compiler.
-The language is named after Nicolaus Wirth the creator of pascal.
+The language is named after Niklaus Wirth the creator of pascal.
 
 ## Compiler
 
 The compiler is based on llvm and will generate a native binary for the target plattform.
-For now only `linux-x86-64` is supported.
+For now only `linux-x86-64` and `win64` are supported.
 
 ## Current Restrictions
 
-- only ascii characters are allowed in the source code
-- no support for `set` types
-- no support for `file` types with a sub type
-- no support for `packed` types
-- no support for `class` or `object` types
+> [!WARNING]
+> - only ascii characters are allowed in the source code
+> - no support for `set` types
+> - no support for `file` types with a sub type
+> - no support for `packed` types
+> - no support for `class` or `object` types
 
 ### Options
 

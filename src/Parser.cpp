@@ -67,12 +67,8 @@ Parser::Parser(const std::vector<std::filesystem::path> &rtlDirectories, std::fi
 }
 bool Parser::hasError() const
 {
-    for (auto &msg: m_errors)
-    {
-        if (msg.outputType == OutputType::ERROR)
-            return true;
-    }
-    return false;
+    return std::ranges::any_of(m_errors.begin(), m_errors.end(),
+                               [](const ParserError &msg) { return msg.outputType == OutputType::ERROR; });
 }
 bool Parser::hasMessages() const { return !m_errors.empty(); }
 void Parser::printErrors(std::ostream &outputStream, const bool printColor) const

@@ -23,6 +23,7 @@ void printHelp(const std::string &program)
     std::cout << "  --llvm-ir\t\tOutputs the LLVM-IR to the standard error output\n";
     std::cout << "  --help\t\tOutputs the program help\n";
     std::cout << "  --version\t\tPrints the current version of the compiler\n";
+    std::cout << "  --lsp\t\t\tStarts the compiler in the language server mode\n";
 }
 
 int main(int args, char **argv)

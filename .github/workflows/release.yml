@@ -1,0 +1,151 @@
+name: release
+on:
+  push:
+    tags:
+      - '*'
+jobs:
+  job:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.experimental }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows (x64)
+            os: windows-latest
+            triplet: x64-windows
+            arch: x64
+            winarch: win64
+            experimental: false
+          # - name: Windows (x86)
+          #   os: windows-latest
+          #   triplet: x86-windows
+          #   experimental: false
+          #   arch: Win32
+          - name: Ubuntu (GCC)
+            os: ubuntu-24.04
+            triplet: x64-linux
+            cc: gcc
+            cxx: g++
+            arch: amd64
+            experimental: false
+          - name: Ubuntu (Clang)
+            os: ubuntu-24.04
+            triplet: x64-linux
+            cc: clang-18
+            cxx: clang++-18
+            arch: amd64
+            experimental: false
+
+    env:
+      # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
+      BUILD_TYPE: Debug
+      # Indicates the CMake build directory where project files and binaries are being produced.
+      CMAKE_BUILD_DIR: ${{ github.workspace }}/build/
+      # Indicates the location of the vcpkg as a Git submodule of the project repository.
+      #VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+      LLVM_DIR: "${{ github.workspace }}/llvm"
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+      - name: 'Windows: Install clang v18.1.8 from GitHub'
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          set -eux
+          cd ..
+          curl -fL --retry 3 --max-time 300 -o clang.exe \
+          https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/LLVM-18.1.8-win64.exe
+          ./clang.exe //S # double-slash for bash
+          rm clang.exe
+          # C:\Program Files\LLVM\bin should already be in PATH
+          clang-cl --version
+          echo "C:\Program Files\LLVM\bin" >> $GITHUB_PATH
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y llvm-18 llvm-18-dev
+        if: matrix.triplet == 'x64-linux'
+      - name: 'Windows: Install LLVM v18.1.8 from GitHub'
+        shell: bash
+        working-directory: ${{github.workspace}}
+        run: |
+          set -eux
+          curl -fL --retry 3 --max-time 300 -o llvm.7z \
+            https://github.com/vovkos/llvm-package-windows/releases/download/llvm-18.1.8/llvm-18.1.8-windows-amd64-msvc17-msvcrt-dbg.7z
+          mkdir llvm
+          cd llvm
+          7z x ../llvm.7z >/dev/null
+          rm ../llvm.7z
+          cd ..
+          # llvm/bin/llvm-config --version
+        if: runner.os == 'Windows'
+      - name: Show content of workspace after cache has been restored
+        run: find $RUNNER_WORKSPACE
+        shell: bash
+
+      # On Windows runners, let's ensure to have the Developer Command Prompt environment setup correctly. As used here the Developer Command Prompt created is targeting x64 and using the default the Windows SDK.
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: ${{ matrix.arch }}
+        if: matrix.os == 'windows-latest'
+
+      # Run CMake to generate Ninja project files, using the vcpkg's toolchain file to resolve and install the dependencies as specified in vcpkg.json.
+      - name: Install dependencies and generate project files (Linux)
+        run: |
+          cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DWIRTHX_PATH="/usr/include/wirthx" -DBUILD_TESTS=OFF -DCMAKE_BUILD_TYPE=Release
+        if: matrix.triplet == 'x64-linux'
+      - name: Install dependencies and generate project files (Windows)
+        run: |
+          cmake -B "${{ env.CMAKE_BUILD_DIR }}" "-DLLVM_ROOT_DIR=${{ env.LLVM_DIR }}"  -A ${{matrix.arch}} -DBUILD_TESTS=OFF -DCMAKE_BUILD_TYPE=Release
+        if: matrix.os == 'windows-latest'
+      # Build the whole project with Ninja (which is spawn by CMake).
+      - name: Build
+        run: |
+          cmake --build "${{ env.CMAKE_BUILD_DIR }}" --config ${{env.BUILD_TYPE}}
+      - name: Show content of workspace at its completion
+        run: find $RUNNER_WORKSPACE
+        shell: bash
+      - name: version linux
+        run: echo "version=$(cat ${{ env.CMAKE_BUILD_DIR }}/VERSION.TXT)" >> $GITHUB_OUTPUT
+        id: version-linux
+        if: matrix.os == 'ubuntu-latest'
+      - name: version windows
+        working-directory: build
+        run: |
+          cd ${{ env.CMAKE_BUILD_DIR }}
+          echo "version=$(cat ${{ env.CMAKE_BUILD_DIR }}/VERSION.TXT)" >> $Env:GITHUB_OUTPUT
+        id: version-windows
+        if: matrix.os == 'windows-latest'
+      - name: Build Packages Linux
+        working-directory: build
+        run: |
+          make package
+        if: matrix.os == 'ubuntu-latest'
+      - name: Build Packages Windows
+        working-directory: build
+        run: |
+          cpack -G ZIP -C Release
+        if: matrix.os == 'windows-latest'
+      - name: upload linux artifact
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            ${{ env.CMAKE_BUILD_DIR }}/wirthx-${{ steps.version-linux.outputs.version }}-${{matrix.arch}}.deb
+            ${{ env.CMAKE_BUILD_DIR }}/wirthx-${{ steps.version-linux.outputs.version }}-${{matrix.arch}}.tar.gz
+          token: ${{ github.token }}
+        env:
+          GITHUB_REPOSITORY: wirthx-compiler/wirthx
+        if: matrix.os == 'ubuntu-latest'
+      - name: upload windows artifact (zip)
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ${{ env.CMAKE_BUILD_DIR }}\wirthx-${{ steps.version-windows.outputs.version }}-${{matrix.winarch}}.zip
+          token: ${{ github.token }}
+        env:
+          GITHUB_REPOSITORY: wirthx-compiler/wirthx
+        if: matrix.os == 'windows-latest'
+  
