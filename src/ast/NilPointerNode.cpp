@@ -6,7 +6,7 @@ NilPointerNode::NilPointerNode(const Token &token) : ASTNode(token) {}
 void NilPointerNode::print() {}
 llvm::Value *NilPointerNode::codegen(std::unique_ptr<Context> &context)
 {
-    return llvm::ConstantPointerNull::get(llvm::PointerType::getUnqual(*context->TheContext));
+    return llvm::ConstantPointerNull::get(llvm::PointerType::getUnqual(*context->context()));
 }
 std::shared_ptr<VariableType> NilPointerNode::resolveType(const std::unique_ptr<UnitNode> &unit, ASTNode *parentNode)
 {

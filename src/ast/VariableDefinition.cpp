@@ -16,24 +16,24 @@ llvm::AllocaInst *VariableDefinition::generateCode(std::unique_ptr<Context> &con
     {
         const auto arrayType = array->generateLlvmType(context);
 
-        auto arrayAllocation = context->Builder->CreateAlloca(arrayType, nullptr, this->variableName);
+        auto arrayAllocation = context->builder()->CreateAlloca(arrayType, nullptr, this->variableName);
 
         if (array->isDynArray)
         {
             const auto arraySizeOffset =
-                    context->Builder->CreateStructGEP(arrayType, arrayAllocation, 0, "array.size.offset");
+                    context->builder()->CreateStructGEP(arrayType, arrayAllocation, 0, "array.size.offset");
             const auto arrayPointerOffset =
-                    context->Builder->CreateStructGEP(arrayType, arrayAllocation, 1, "array.ptr.offset");
-            context->Builder->CreateStore(context->Builder->getInt64(0), arraySizeOffset);
-            context->Builder->CreateStore(llvm::ConstantPointerNull::get(llvm::PointerType::getUnqual(
-                                                  array->arrayBase->generateLlvmType(context))),
-                                          arrayPointerOffset);
+                    context->builder()->CreateStructGEP(arrayType, arrayAllocation, 1, "array.ptr.offset");
+            context->builder()->CreateStore(context->builder()->getInt64(0), arraySizeOffset);
+            context->builder()->CreateStore(llvm::ConstantPointerNull::get(llvm::PointerType::getUnqual(
+                                                    array->arrayBase->generateLlvmType(context))),
+                                            arrayPointerOffset);
 
 
             return arrayAllocation;
         }
 
-        auto *gvar_array_a = new llvm::GlobalVariable(*context->TheModule, arrayType, true,
+        auto *gvar_array_a = new llvm::GlobalVariable(*context->module(), arrayType, true,
                                                       llvm::GlobalValue::ExternalLinkage, nullptr, this->variableName);
 
         // Constant Definitions
@@ -43,22 +43,22 @@ llvm::AllocaInst *VariableDefinition::generateCode(std::unique_ptr<Context> &con
         gvar_array_a->setInitializer(const_array_2);
         {
             auto memcpyCall = llvm::Intrinsic::getDeclaration(
-                    context->TheModule.get(), llvm::Intrinsic::memcpy,
-                    {context->Builder->getPtrTy(), context->Builder->getPtrTy(), context->Builder->getInt64Ty()});
+                    context->module().get(), llvm::Intrinsic::memcpy,
+                    {context->builder()->getPtrTy(), context->builder()->getPtrTy(), context->builder()->getInt64Ty()});
             std::vector<llvm::Value *> memcopyArgs;
 
-            const llvm::DataLayout &DL = context->TheModule->getDataLayout();
+            const llvm::DataLayout &DL = context->module()->getDataLayout();
             uint64_t structSize = DL.getTypeAllocSize(arrayType);
 
 
-            memcopyArgs.push_back(context->Builder->CreateBitCast(arrayAllocation, context->Builder->getPtrTy()));
-            memcopyArgs.push_back(context->Builder->CreateBitCast(gvar_array_a, context->Builder->getPtrTy()));
-            memcopyArgs.push_back(context->Builder->getInt64(structSize));
-            memcopyArgs.push_back(context->Builder->getFalse());
+            memcopyArgs.push_back(context->builder()->CreateBitCast(arrayAllocation, context->builder()->getPtrTy()));
+            memcopyArgs.push_back(context->builder()->CreateBitCast(gvar_array_a, context->builder()->getPtrTy()));
+            memcopyArgs.push_back(context->builder()->getInt64(structSize));
+            memcopyArgs.push_back(context->builder()->getFalse());
 
-            context->Builder->CreateCall(memcpyCall, memcopyArgs);
+            context->builder()->CreateCall(memcpyCall, memcopyArgs);
         }
-        // context->Builder->CreateStore(gvar_array_a, arrayAllocation);
+        // context->builder()->CreateStore(gvar_array_a, arrayAllocation);
         return arrayAllocation;
     }
 
@@ -68,40 +68,40 @@ llvm::AllocaInst *VariableDefinition::generateCode(std::unique_ptr<Context> &con
         case VariableBaseType::Integer:
         {
             auto type = this->variableType->generateLlvmType(context);
-            auto allocation = context->Builder->CreateAlloca(type, nullptr, this->variableName);
+            auto allocation = context->builder()->CreateAlloca(type, nullptr, this->variableName);
             // if (!this->value)
-            context->Builder->CreateStore(
-                    context->Builder->getIntN(allocation->getAllocatedType()->getIntegerBitWidth(), 0), allocation);
+            context->builder()->CreateStore(
+                    context->builder()->getIntN(allocation->getAllocatedType()->getIntegerBitWidth(), 0), allocation);
             return allocation;
         }
         case VariableBaseType::Character:
         {
             auto type = this->variableType->generateLlvmType(context);
-            auto allocation = context->Builder->CreateAlloca(type, nullptr, this->variableName);
-            context->Builder->CreateStore(
-                    context->Builder->getIntN(allocation->getAllocatedType()->getIntegerBitWidth(), 0), allocation);
+            auto allocation = context->builder()->CreateAlloca(type, nullptr, this->variableName);
+            context->builder()->CreateStore(
+                    context->builder()->getIntN(allocation->getAllocatedType()->getIntegerBitWidth(), 0), allocation);
             return allocation;
         }
         case VariableBaseType::Boolean:
         {
             auto allocation =
-                    context->Builder->CreateAlloca(context->Builder->getInt1Ty(), nullptr, this->variableName);
-            context->Builder->CreateStore(context->Builder->getFalse(), allocation);
+                    context->builder()->CreateAlloca(context->builder()->getInt1Ty(), nullptr, this->variableName);
+            context->builder()->CreateStore(context->builder()->getFalse(), allocation);
             return allocation;
         }
         case VariableBaseType::Float:
-            return context->Builder->CreateAlloca(llvm::Type::getFloatTy(*context->TheContext), nullptr,
-                                                  this->variableName);
+            return context->builder()->CreateAlloca(llvm::Type::getFloatTy(*context->context()), nullptr,
+                                                    this->variableName);
         case VariableBaseType::Double:
-            return context->Builder->CreateAlloca(llvm::Type::getDoubleTy(*context->TheContext), nullptr,
-                                                  this->variableName);
+            return context->builder()->CreateAlloca(llvm::Type::getDoubleTy(*context->context()), nullptr,
+                                                    this->variableName);
         case VariableBaseType::Struct:
         {
             const auto structType = std::dynamic_pointer_cast<RecordType>(this->variableType);
             if (structType != nullptr)
             {
-                return context->Builder->CreateAlloca(structType->generateLlvmType(context), nullptr,
-                                                      this->variableName);
+                return context->builder()->CreateAlloca(structType->generateLlvmType(context), nullptr,
+                                                        this->variableName);
             }
         }
         case VariableBaseType::String:
@@ -110,15 +110,15 @@ llvm::AllocaInst *VariableDefinition::generateCode(std::unique_ptr<Context> &con
             if (stringType != nullptr)
             {
                 const auto llvmType = stringType->generateLlvmType(context);
-                const auto allocated = context->Builder->CreateAlloca(llvmType, nullptr, this->variableName);
+                const auto allocated = context->builder()->CreateAlloca(llvmType, nullptr, this->variableName);
 
                 const auto arraySizeOffset =
-                        context->Builder->CreateStructGEP(llvmType, allocated, 1, "string.size.offset");
+                        context->builder()->CreateStructGEP(llvmType, allocated, 1, "string.size.offset");
                 const auto arrayPointerOffset =
-                        context->Builder->CreateStructGEP(llvmType, allocated, 2, "string.ptr.offset");
-                context->Builder->CreateStore(context->Builder->getInt64(0), arraySizeOffset);
-                context->Builder->CreateStore(
-                        llvm::ConstantPointerNull::get(llvm::PointerType::getUnqual(*context->TheContext)),
+                        context->builder()->CreateStructGEP(llvmType, allocated, 2, "string.ptr.offset");
+                context->builder()->CreateStore(context->builder()->getInt64(0), arraySizeOffset);
+                context->builder()->CreateStore(
+                        llvm::ConstantPointerNull::get(llvm::PointerType::getUnqual(*context->context())),
                         arrayPointerOffset);
                 return allocated;
             }
@@ -127,7 +127,7 @@ llvm::AllocaInst *VariableDefinition::generateCode(std::unique_ptr<Context> &con
         {
             const auto type = std::dynamic_pointer_cast<PointerType>(this->variableType);
 
-            return context->Builder->CreateAlloca(type->generateLlvmType(context), nullptr, this->variableName);
+            return context->builder()->CreateAlloca(type->generateLlvmType(context), nullptr, this->variableName);
         }
         case VariableBaseType::File:
         {
@@ -135,12 +135,12 @@ llvm::AllocaInst *VariableDefinition::generateCode(std::unique_ptr<Context> &con
             if (fileType != nullptr)
             {
                 auto llvmFileType = fileType->generateLlvmType(context);
-                auto allocatedFile = context->Builder->CreateAlloca(llvmFileType, nullptr, this->variableName);
+                auto allocatedFile = context->builder()->CreateAlloca(llvmFileType, nullptr, this->variableName);
                 if (llvmValue)
                 {
-                    auto filePtr = context->Builder->CreateStructGEP(llvmFileType, allocatedFile, 1, "file.ptr");
+                    auto filePtr = context->builder()->CreateStructGEP(llvmFileType, allocatedFile, 1, "file.ptr");
 
-                    context->Builder->CreateStore(llvmValue, filePtr);
+                    context->builder()->CreateStore(llvmValue, filePtr);
                 }
                 return allocatedFile;
             }
@@ -148,10 +148,10 @@ llvm::AllocaInst *VariableDefinition::generateCode(std::unique_ptr<Context> &con
         case VariableBaseType::Enum:
         {
             auto type = this->variableType->generateLlvmType(context);
-            auto allocation = context->Builder->CreateAlloca(type, nullptr, this->variableName);
+            auto allocation = context->builder()->CreateAlloca(type, nullptr, this->variableName);
             // if (!this->value)
-            context->Builder->CreateStore(
-                    context->Builder->getIntN(allocation->getAllocatedType()->getIntegerBitWidth(), 0), allocation);
+            context->builder()->CreateStore(
+                    context->builder()->getIntN(allocation->getAllocatedType()->getIntegerBitWidth(), 0), allocation);
             return allocation;
         }
         default:
@@ -163,11 +163,8 @@ llvm::AllocaInst *VariableDefinition::generateCode(std::unique_ptr<Context> &con
 
 llvm::Value *VariableDefinition::generateCodeForConstant(std::unique_ptr<Context> &context) const
 {
-    llvm::Function *TheFunction = context->TopLevelFunction;
-    if (TheFunction)
-        llvm::IRBuilder<> TmpB(&TheFunction->getEntryBlock(), TheFunction->getEntryBlock().begin());
-
-    // auto array = std::dynamic_pointer_cast<ArrayType>(this->variableType);
+    if (llvm::Function *currentFunction = context->currentFunction())
+        llvm::IRBuilder<> TmpB(&currentFunction->getEntryBlock(), currentFunction->getEntryBlock().begin());
 
     return this->value->codegenForTargetType(context, this->variableType);
 }

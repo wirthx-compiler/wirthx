@@ -14,11 +14,11 @@ std::shared_ptr<VariableType> ASTNode::resolveType([[maybe_unused]] const std::u
 }
 ASTNode *ASTNode::resolveParent(const std::unique_ptr<Context> &context)
 {
-    ASTNode *parent = context->ProgramUnit.get();
-    if (context->TopLevelFunction)
+    ASTNode *parent = context->programUnit().get();
+    if (context->currentFunction())
     {
         if (const auto def =
-                    context->ProgramUnit->getFunctionDefinition(std::string(context->TopLevelFunction->getName())))
+                    context->programUnit()->getFunctionDefinition(std::string(context->currentFunction()->getName())))
         {
             parent = def.value().get();
         }

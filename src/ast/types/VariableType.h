@@ -28,7 +28,7 @@ namespace llvm
     class AllocaInst;
 } // namespace llvm
 
-struct Context;
+class Context;
 
 class IntegerType;
 

@@ -2,6 +2,7 @@
 
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "CompilerOptions.h"
@@ -18,8 +19,6 @@ namespace llvm
     class Value;
     class Function;
 
-    class PassInstrumentationCallbacks;
-    class StandardInstrumentations;
     class BasicBlock;
     class ConstantFolder;
     class IRBuilderDefaultInserter;
@@ -28,16 +27,6 @@ namespace llvm
     template<class FolderTy, class InserterTy>
     class IRBuilder;
 
-    template<typename IRUnitT, typename... ExtraArgTs>
-    class AnalysisManager;
-
-    template<typename IRUnitT, typename AnalysisManagerT, typename... ExtraArgTs>
-    class PassManager;
-
-    using FunctionPassManager = PassManager<Function, AnalysisManager<Function>>;
-    using ModulePassManager = PassManager<Module, AnalysisManager<Module>>;
-    using FunctionAnalysisManager = AnalysisManager<Function>;
-    using ModuleAnalysisManager = AnalysisManager<Module>;
 
 } // namespace llvm
 
@@ -52,29 +41,41 @@ struct BreakBasicBlock
     bool BlockUsed = false;
 };
 
-struct Context
-{
-    std::unique_ptr<llvm::LLVMContext> TheContext;
-    std::unique_ptr<llvm::Module> TheModule;
-    std::unique_ptr<llvm::IRBuilder<llvm::ConstantFolder, llvm::IRBuilderDefaultInserter>> Builder;
-    std::unordered_map<std::string, llvm::AllocaInst *> NamedAllocations;
-    std::unordered_map<std::string, llvm::Value *> NamedValues;
-    llvm::Function *TopLevelFunction;
-    std::unordered_map<std::string, llvm::Function *> FunctionDefinitions;
-    BreakBasicBlock BreakBlock;
+struct ContextImpl;
 
-    std::unique_ptr<llvm::FunctionPassManager> TheFPM;
-    std::unique_ptr<llvm::FunctionAnalysisManager> TheFAM;
-    std::unique_ptr<llvm::ModuleAnalysisManager> TheMAM;
-    std::unique_ptr<llvm::ModulePassManager> TheMPM;
-    std::unique_ptr<llvm::PassInstrumentationCallbacks> ThePIC;
-    std::unique_ptr<llvm::StandardInstrumentations> TheSI;
+class Context
+{
+private:
+    CompilerOptions compilerOptions;
+    std::shared_ptr<ContextImpl> m_impl;
+    std::unique_ptr<UnitNode> ProgramUnit;
+
+public:
+    bool loadValue = true;
+    bool explicitReturn = false;
     std::unique_ptr<llvm::Triple> TargetTriple;
 
-    std::unique_ptr<UnitNode> ProgramUnit;
-    CompilerOptions compilerOptions;
-    bool loadValue = true;
-    bool expliciteReturn = false;
+
+    explicit Context(std::unique_ptr<UnitNode> &unit, const CompilerOptions &options, const std::string &TargetTriple);
+
+    std::unique_ptr<llvm::Module> &module() const;
+    llvm::Function *currentFunction() const;
+    void setCurrentFunction(llvm::Function *function) const;
+    llvm::AllocaInst *namedAllocation(const std::string &name) const;
+    llvm::Value *namedValue(const std::string &name) const;
+    BreakBasicBlock &breakBlock() const;
+    std::unique_ptr<llvm::LLVMContext> &context() const;
+    std::unique_ptr<UnitNode> &programUnit();
+    const CompilerOptions &options() const { return compilerOptions; }
+
+    std::unique_ptr<llvm::IRBuilder<llvm::ConstantFolder, llvm::IRBuilderDefaultInserter>> &builder() const;
+    void verifyModule(llvm::Function *function) const;
+    void verifyFunction(llvm::Function *function) const;
+    void setNamedAllocation(const std::string &name, llvm::AllocaInst *allocation) const;
+    void removeName(const std::string &name) const;
+    void setNamedValue(const std::string &name, llvm::Value *value) const;
+    void addFunctionDefinition(const std::string &function_signature, llvm::Function *function) const;
+    llvm::Function *functionDefinition(const std::string &string) const;
 };
 
 void LogError(const char *Str);

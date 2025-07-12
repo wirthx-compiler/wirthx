@@ -1,11 +1,7 @@
 #include "ArrayAssignmentNode.h"
 
-#include <utility>
 
 #include "ArrayAccessNode.h"
-#include "BinaryOperationNode.h"
-#include "ComparissionNode.h"
-#include "LogicalExpressionNode.h"
 #include "SystemFunctionCallNode.h"
 #include "UnitNode.h"
 #include "VariableAccessNode.h"
@@ -32,19 +28,19 @@ void ArrayAssignmentNode::range_check(const std::shared_ptr<FieldAccessableType>
 {
     const Token token = expressionToken();
 
-    const auto lowValue = context->Builder->getInt64(0);
+    const auto lowValue = context->builder()->getInt64(0);
     auto index = m_indexNode->codegen(context);
     constexpr unsigned maxBitWith = 64;
-    const auto targetType = llvm::IntegerType::get(*context->TheContext, maxBitWith);
+    const auto targetType = llvm::IntegerType::get(*context->context(), maxBitWith);
     if (maxBitWith != index->getType()->getIntegerBitWidth())
     {
-        index = context->Builder->CreateIntCast(index, targetType, true, "lhs_cast");
+        index = context->builder()->CreateIntCast(index, targetType, true, "lhs_cast");
     }
 
     const auto highValue = fieldAccesableType->generateHighValue(m_arrayToken, context);
-    const auto compareSmaller = context->Builder->CreateICmpSLE(index, highValue);
-    const auto compareGreater = context->Builder->CreateICmpSGE(index, lowValue);
-    const auto andNode = context->Builder->CreateAnd(compareGreater, compareSmaller);
+    const auto compareSmaller = context->builder()->CreateICmpSLE(index, highValue);
+    const auto compareGreater = context->builder()->CreateICmpSGE(index, lowValue);
+    const auto andNode = context->builder()->CreateAnd(compareGreater, compareSmaller);
     const std::string message = "index out of range for expression: " + token.lexical();
 
     SystemFunctionCallNode::codegen_assert(context, resolveParent(context), this, andNode, message);
@@ -53,15 +49,15 @@ void ArrayAssignmentNode::range_check(const std::shared_ptr<FieldAccessableType>
 llvm::Value *ArrayAssignmentNode::codegen(std::unique_ptr<Context> &context)
 {
     // Look this variable up in the function.
-    llvm::Value *V = context->NamedAllocations[m_variableName];
+    llvm::Value *V = context->namedAllocation(m_variableName);
 
-    if (!V && context->TopLevelFunction)
+    if (!V && context->currentFunction())
     {
-        for (auto &arg: context->TopLevelFunction->args())
+        for (auto &arg: context->currentFunction()->args())
         {
             if (arg.getName() == m_variableName)
             {
-                V = context->TopLevelFunction->getArg(arg.getArgNo());
+                V = context->currentFunction()->getArg(arg.getArgNo());
                 break;
             }
         }
@@ -73,13 +69,13 @@ llvm::Value *ArrayAssignmentNode::codegen(std::unique_ptr<Context> &context)
     const auto result = m_expression->codegen(context);
 
     auto index = m_indexNode->codegen(context);
-    auto arrayDef = context->ProgramUnit->getVariableDefinition(m_variableName);
+    auto arrayDef = context->programUnit()->getVariableDefinition(m_variableName);
     std::shared_ptr<VariableType> variableType = nullptr;
 
-    if (context->TopLevelFunction)
+    if (context->currentFunction())
     {
         if (const auto functionDef =
-                    context->ProgramUnit->getFunctionDefinition(context->TopLevelFunction->getName().str()))
+                    context->programUnit()->getFunctionDefinition(context->currentFunction()->getName().str()))
         {
             arrayDef = functionDef.value()->body()->getVariableDefinition(m_variableName);
             if (!arrayDef)
@@ -115,8 +111,8 @@ llvm::Value *ArrayAssignmentNode::codegen(std::unique_ptr<Context> &context)
         }
 
         if (def->low > 0)
-            index = context->Builder->CreateSub(
-                    index, context->Builder->getIntN(index->getType()->getIntegerBitWidth(), def->low), "subtmp");
+            index = context->builder()->CreateSub(
+                    index, context->builder()->getIntN(index->getType()->getIntegerBitWidth(), def->low), "subtmp");
 
         const auto llvmRecordType = def->generateLlvmType(context);
 
@@ -131,23 +127,24 @@ llvm::Value *ArrayAssignmentNode::codegen(std::unique_ptr<Context> &context)
 
             const auto arrayBaseType = def->arrayBase->generateLlvmType(context);
 
-            const auto arrayPointerOffset = context->Builder->CreateStructGEP(llvmRecordType, V, 1, "array.ptr.offset");
+            const auto arrayPointerOffset =
+                    context->builder()->CreateStructGEP(llvmRecordType, V, 1, "array.ptr.offset");
 
-            const auto loadResult = context->Builder->CreateLoad(llvm::PointerType::getUnqual(*context->TheContext),
-                                                                 arrayPointerOffset);
+            const auto loadResult = context->builder()->CreateLoad(llvm::PointerType::getUnqual(*context->context()),
+                                                                   arrayPointerOffset);
 
 
-            const auto bounds = context->Builder->CreateGEP(arrayBaseType, loadResult,
-                                                            llvm::ArrayRef<llvm::Value *>{index}, "", true);
+            const auto bounds = context->builder()->CreateGEP(arrayBaseType, loadResult,
+                                                              llvm::ArrayRef<llvm::Value *>{index}, "", true);
 
-            context->Builder->CreateStore(result, bounds);
+            context->builder()->CreateStore(result, bounds);
             return result;
         }
 
-        const auto bounds = context->Builder->CreateGEP(llvmRecordType, V, {context->Builder->getInt64(0), index},
-                                                        "arrayindex", false);
+        const auto bounds = context->builder()->CreateGEP(llvmRecordType, V, {context->builder()->getInt64(0), index},
+                                                          "arrayindex", false);
 
-        context->Builder->CreateStore(result, bounds);
+        context->builder()->CreateStore(result, bounds);
         return result;
     }
     if (const auto def = std::dynamic_pointer_cast<StringType>(variableType))
@@ -157,16 +154,16 @@ llvm::Value *ArrayAssignmentNode::codegen(std::unique_ptr<Context> &context)
         const auto llvmRecordType = def->generateLlvmType(context);
         const auto arrayBaseType = IntegerType::getInteger(8)->generateLlvmType(context);
 
-        const auto arrayPointerOffset = context->Builder->CreateStructGEP(llvmRecordType, V, 2, "array.ptr.offset");
+        const auto arrayPointerOffset = context->builder()->CreateStructGEP(llvmRecordType, V, 2, "array.ptr.offset");
 
         const auto loadResult =
-                context->Builder->CreateLoad(llvm::PointerType::getUnqual(*context->TheContext), arrayPointerOffset);
+                context->builder()->CreateLoad(llvm::PointerType::getUnqual(*context->context()), arrayPointerOffset);
 
 
-        const auto bounds =
-                context->Builder->CreateGEP(arrayBaseType, loadResult, llvm::ArrayRef<llvm::Value *>{index}, "", true);
+        const auto bounds = context->builder()->CreateGEP(arrayBaseType, loadResult,
+                                                          llvm::ArrayRef<llvm::Value *>{index}, "", true);
 
-        context->Builder->CreateStore(result, bounds);
+        context->builder()->CreateStore(result, bounds);
     }
 
     if (const auto ptrType = std::dynamic_pointer_cast<PointerType>(variableType))
@@ -174,13 +171,13 @@ llvm::Value *ArrayAssignmentNode::codegen(std::unique_ptr<Context> &context)
         const auto arrayBaseType = ptrType->pointerBase->generateLlvmType(context);
 
 
-        const auto loadResult = context->Builder->CreateLoad(llvm::PointerType::getUnqual(*context->TheContext), V);
+        const auto loadResult = context->builder()->CreateLoad(llvm::PointerType::getUnqual(*context->context()), V);
 
 
-        const auto bounds =
-                context->Builder->CreateGEP(arrayBaseType, loadResult, llvm::ArrayRef<llvm::Value *>{index}, "", true);
+        const auto bounds = context->builder()->CreateGEP(arrayBaseType, loadResult,
+                                                          llvm::ArrayRef<llvm::Value *>{index}, "", true);
 
-        context->Builder->CreateStore(result, bounds);
+        context->builder()->CreateStore(result, bounds);
     }
     return nullptr;
 }

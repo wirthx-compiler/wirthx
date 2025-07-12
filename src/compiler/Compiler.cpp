@@ -42,78 +42,6 @@
 
 static auto TargetTriple = llvm::sys::getDefaultTargetTriple();
 
-std::unique_ptr<Context> InitializeModule(std::unique_ptr<UnitNode> &unit, const CompilerOptions &options)
-{
-    auto context = std::make_unique<Context>();
-    context->compilerOptions = options;
-    // Open a new context and module.
-    context->TheContext = std::make_unique<llvm::LLVMContext>();
-    context->TheModule = std::make_unique<llvm::Module>(unit->getUnitName(), *context->TheContext);
-
-    // Create a new builder for the module.
-    context->Builder = std::make_unique<llvm::IRBuilder<>>(*context->TheContext);
-    // Create new pass and analysis managers.
-    context->TheFPM = std::make_unique<llvm::FunctionPassManager>();
-    context->TheMPM = std::make_unique<llvm::ModulePassManager>();
-    const auto TheLAM = std::make_unique<llvm::LoopAnalysisManager>();
-    context->TheFAM = std::make_unique<llvm::FunctionAnalysisManager>();
-    const auto TheCGAM = std::make_unique<llvm::CGSCCAnalysisManager>();
-    context->TheMAM = std::make_unique<llvm::ModuleAnalysisManager>();
-    context->ThePIC = std::make_unique<llvm::PassInstrumentationCallbacks>();
-    context->TheSI = std::make_unique<llvm::StandardInstrumentations>(*context->TheContext,
-                                                                      /*DebugLogging*/ true);
-
-    context->TheSI->registerCallbacks(*context->ThePIC, context->TheMAM.get());
-    context->TargetTriple = std::make_unique<llvm::Triple>(TargetTriple);
-
-    // Add transform passes.
-    // Do simple "peephole" optimizations and bit-twiddling optzns.
-    if (context->compilerOptions.buildMode == BuildMode::Release)
-    {
-        context->TheFPM->addPass(llvm::InstCombinePass());
-        // Reassociate expressions.
-        context->TheFPM->addPass(llvm::ReassociatePass());
-        // Eliminate Common SubExpressions.
-        context->TheFPM->addPass(llvm::GVNPass());
-        // Simplify the control flow graph (deleting unreachable blocks, etc).
-        context->TheFPM->addPass(llvm::SimplifyCFGPass());
-
-        context->TheFPM->addPass(llvm::SCCPPass());
-
-        context->TheFPM->addPass(llvm::LoopSimplifyPass());
-
-        context->TheFPM->addPass(llvm::MemCpyOptPass());
-
-        context->TheFPM->addPass(llvm::DCEPass());
-        context->TheMPM->addPass(llvm::AlwaysInlinerPass());
-
-
-        context->TheMPM->addPass(llvm::PartialInlinerPass());
-        context->TheMPM->addPass(llvm::ModuleInlinerPass());
-        context->TheMPM->addPass(llvm::GlobalDCEPass());
-
-        // how do i remove unused functions?
-
-
-        context->TheMPM->addPass(llvm::createModuleToFunctionPassAdaptor(
-                llvm::DCEPass())); // Remove dead functions and global variables.
-    }
-
-
-    // context->TheFPM->addPass(llvm::createLoopSimplifyPass());
-
-    // Register analysis passes used in these transform passes.
-    llvm::PassBuilder PB;
-
-    PB.registerModuleAnalyses(*context->TheMAM);
-    PB.registerFunctionAnalyses(*context->TheFAM);
-    PB.crossRegisterProxies(*TheLAM, *context->TheFAM, *TheCGAM, *context->TheMAM);
-
-
-    context->ProgramUnit = std::move(unit);
-    return context;
-}
-
 
 void init_compiler()
 {
@@ -201,12 +129,12 @@ void compile_file(const CompilerOptions &options, const std::filesystem::path &i
     {
         parser.printErrors(errorStream, options.colorOutput);
     }
-    auto context = InitializeModule(unit, options);
+    auto context = std::make_unique<Context>(unit, options, TargetTriple);
     auto intType = VariableType::getInteger();
     auto int64Type = VariableType::getInteger(64);
     auto int8Type = VariableType::getInteger(8);
     auto pCharType = ::PointerType::getPointerTo(VariableType::getInteger(8));
-    context->TheModule->setDataLayout(TheTargetMachine->createDataLayout());
+    context->module()->setDataLayout(TheTargetMachine->createDataLayout());
 
     createSystemCall(context, "exit", {FunctionArgument{.type = intType, .argumentName = "X", .isReference = false}});
     createSystemCall(context, "fflush",
@@ -261,8 +189,8 @@ void compile_file(const CompilerOptions &options, const std::filesystem::path &i
 
     try
     {
-        context->ProgramUnit->typeCheck(context->ProgramUnit, nullptr);
-        context->ProgramUnit->codegen(context);
+        context->programUnit()->typeCheck(context->programUnit(), nullptr);
+        context->programUnit()->codegen(context);
     }
     catch (CompilerException &e)
     {
@@ -271,10 +199,10 @@ void compile_file(const CompilerOptions &options, const std::filesystem::path &i
     }
 
 
-    auto basePath = context->compilerOptions.outputDirectory;
+    auto basePath = context->options().outputDirectory;
 
 
-    auto objectFileName = basePath / (context->ProgramUnit->getUnitName() + ".o");
+    auto objectFileName = basePath / (context->programUnit()->getUnitName() + ".o");
     std::vector<std::string> objectFiles;
     objectFiles.emplace_back(objectFileName.string());
     std::error_code EC;
@@ -287,7 +215,7 @@ void compile_file(const CompilerOptions &options, const std::filesystem::path &i
     }
 
     legacy::PassManager pass;
-    if (context->compilerOptions.buildMode == BuildMode::Release)
+    if (context->options().buildMode == BuildMode::Release)
     {
         pass.add(llvm::createAlwaysInlinerLegacyPass());
         pass.add(llvm::createInstructionCombiningPass());
@@ -305,33 +233,33 @@ void compile_file(const CompilerOptions &options, const std::filesystem::path &i
         return;
     }
 
-    pass.run(*context->TheModule);
+    pass.run(*context->module());
     dest.flush();
     dest.close();
 
 
-    llvm::verifyModule(*context->TheModule, &llvm::errs());
-    if (context->compilerOptions.printLLVMIR)
+    llvm::verifyModule(*context->module(), &llvm::errs());
+    if (context->options().printLLVMIR)
     {
-        context->TheModule->print(llvm::errs(), nullptr, false, false);
+        context->module()->print(llvm::errs(), nullptr, false, false);
     }
 
     outs() << "Wrote " << objectFileName.string() << "\n";
 
     std::vector<std::string> flags;
-    for (const auto &lib: context->ProgramUnit->collectLibsToLink())
+    for (const auto &lib: context->programUnit()->collectLibsToLink())
     {
         flags.push_back("-l" + lib);
     }
 
 
-    if (context->compilerOptions.buildMode == BuildMode::Debug && target.getOS() != Triple::Win32)
+    if (context->options().buildMode == BuildMode::Debug && target.getOS() != Triple::Win32)
     {
         flags.emplace_back("-fsanitize=address");
         flags.emplace_back("-fno-omit-frame-pointer");
     }
 
-    std::string executableName = context->ProgramUnit->getUnitName();
+    std::string executableName = context->programUnit()->getUnitName();
 
     if (target.getOS() == Triple::Win32)
     {
@@ -344,7 +272,7 @@ void compile_file(const CompilerOptions &options, const std::filesystem::path &i
         return;
     }
 
-    if (context->compilerOptions.runProgram)
+    if (context->options().runProgram)
     {
 
         if (!execute_command(outputStream, errorStream, (basePath / executableName).string()))

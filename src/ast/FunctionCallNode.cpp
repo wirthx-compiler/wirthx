@@ -48,24 +48,24 @@ std::string FunctionCallNode::callSignature(const std::unique_ptr<UnitNode> &uni
 llvm::Value *FunctionCallNode::codegen(std::unique_ptr<Context> &context)
 {
     // Look up the name in the global module table.
-    ASTNode *parent = context->ProgramUnit.get();
-    if (context->TopLevelFunction)
+    ASTNode *parent = context->programUnit().get();
+    if (context->currentFunction())
     {
-        if (auto def = context->ProgramUnit->getFunctionDefinition(context->TopLevelFunction->getName().str()))
+        if (auto def = context->programUnit()->getFunctionDefinition(context->currentFunction()->getName().str()))
         {
             parent = def.value().get();
         }
     }
 
-    std::string functionName = callSignature(context->ProgramUnit, parent);
+    std::string functionName = callSignature(context->programUnit(), parent);
 
-    llvm::Function *CalleeF = context->TheModule->getFunction(functionName);
-    auto functionDefinition = context->ProgramUnit->getFunctionDefinition(functionName);
+    llvm::Function *CalleeF = context->module()->getFunction(functionName);
+    auto functionDefinition = context->programUnit()->getFunctionDefinition(functionName);
     if (!CalleeF)
     {
-        functionDefinition = context->ProgramUnit->getFunctionDefinition(m_name);
+        functionDefinition = context->programUnit()->getFunctionDefinition(m_name);
         if (functionDefinition)
-            CalleeF = context->TheModule->getFunction(functionDefinition.value()->functionSignature());
+            CalleeF = context->module()->getFunction(functionDefinition.value()->functionSignature());
         if (CalleeF)
         {
             functionName = m_name;
@@ -108,21 +108,21 @@ llvm::Value *FunctionCallNode::codegen(std::unique_ptr<Context> &context)
             const auto llvmArgType = argType->type->generateLlvmType(context);
 
             auto memcpyCall = llvm::Intrinsic::getDeclaration(
-                    context->TheModule.get(), llvm::Intrinsic::memcpy,
-                    {context->Builder->getPtrTy(), context->Builder->getPtrTy(), context->Builder->getInt64Ty()});
+                    context->module().get(), llvm::Intrinsic::memcpy,
+                    {context->builder()->getPtrTy(), context->builder()->getPtrTy(), context->builder()->getInt64Ty()});
             std::vector<llvm::Value *> memcpyArgs;
-            llvm::AllocaInst *alloca = context->Builder->CreateAlloca(llvmArgType, nullptr, fieldName + "_ptr");
+            llvm::AllocaInst *alloca = context->builder()->CreateAlloca(llvmArgType, nullptr, fieldName + "_ptr");
 
-            const llvm::DataLayout &DL = context->TheModule->getDataLayout();
+            const llvm::DataLayout &DL = context->module()->getDataLayout();
             uint64_t structSize = DL.getTypeAllocSize(argType->type->generateLlvmType(context));
 
 
-            memcpyArgs.push_back(context->Builder->CreateBitCast(alloca, context->Builder->getPtrTy()));
-            memcpyArgs.push_back(context->Builder->CreateBitCast(argValue, context->Builder->getPtrTy()));
-            memcpyArgs.push_back(context->Builder->getInt64(structSize));
-            memcpyArgs.push_back(context->Builder->getFalse());
+            memcpyArgs.push_back(context->builder()->CreateBitCast(alloca, context->builder()->getPtrTy()));
+            memcpyArgs.push_back(context->builder()->CreateBitCast(argValue, context->builder()->getPtrTy()));
+            memcpyArgs.push_back(context->builder()->getInt64(structSize));
+            memcpyArgs.push_back(context->builder()->getFalse());
 
-            context->Builder->CreateCall(memcpyCall, memcpyArgs);
+            context->builder()->CreateCall(memcpyCall, memcpyArgs);
 
             ArgsV.push_back(alloca);
         }
@@ -140,10 +140,10 @@ llvm::Value *FunctionCallNode::codegen(std::unique_ptr<Context> &context)
     auto returnType = functionDefinition.value()->returnType();
     if (returnType && returnType->baseType == VariableBaseType::String)
     {
-        allocInst = context->Builder->CreateAlloca(returnType->generateLlvmType(context));
+        allocInst = context->builder()->CreateAlloca(returnType->generateLlvmType(context));
     }
 
-    auto callInst = context->Builder->CreateCall(CalleeF, ArgsV);
+    auto callInst = context->builder()->CreateCall(CalleeF, ArgsV);
     for (size_t i = 0, e = m_args.size(); i != e; ++i)
     {
         std::optional<FunctionArgument> argType = std::nullopt;
@@ -158,13 +158,13 @@ llvm::Value *FunctionCallNode::codegen(std::unique_ptr<Context> &context)
 
             callInst->addParamAttr(static_cast<unsigned>(i), llvm::Attribute::NoUndef);
             callInst->addParamAttr(static_cast<unsigned>(i),
-                                   llvm::Attribute::getWithByValType(*context->TheContext, llvmArgType));
+                                   llvm::Attribute::getWithByValType(*context->context(), llvmArgType));
         }
     };
 
     if (allocInst)
     {
-        context->Builder->CreateStore(callInst, allocInst);
+        context->builder()->CreateStore(callInst, allocInst);
         return allocInst;
     }
     return callInst;

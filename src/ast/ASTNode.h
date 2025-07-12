@@ -8,7 +8,7 @@ namespace llvm
     class Value;
 
 };
-struct Context;
+class Context;
 
 
 class UnitNode;

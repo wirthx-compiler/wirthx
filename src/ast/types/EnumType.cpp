@@ -1,6 +1,7 @@
 #include "EnumType.h"
 
 #include <llvm/IR/IRBuilder.h>
+#include <ranges>
 
 #include "compiler/Context.h"
 #include "exceptions/CompilerException.h"
@@ -17,7 +18,7 @@ llvm::Value *EnumType::generateUpperBounds(const Token &token, std::unique_ptr<C
 int64_t EnumType::lowerBounds()
 {
     int64_t lowerBound = 0;
-    for (const auto &[name, value]: enumNamesWithValues)
+    for (const auto &value: enumNamesWithValues | std::views::values)
     {
         lowerBound = std::min(lowerBound, value);
     }
@@ -26,7 +27,7 @@ int64_t EnumType::lowerBounds()
 int64_t EnumType::upperBounds()
 {
     int64_t upperBound = 0;
-    for (const auto &[name, value]: enumNamesWithValues)
+    for (const auto &value: enumNamesWithValues | std::views::values)
     {
         upperBound = std::max(upperBound, value);
     }
@@ -35,7 +36,7 @@ int64_t EnumType::upperBounds()
 int64_t EnumType::getValue(const std::string &string) const { return enumNamesWithValues.at(string); }
 std::shared_ptr<EnumType> EnumType::getEnum(const std::string &name) { return std::make_shared<EnumType>(name); }
 bool EnumType::hasEnumKey(const std::string &name) const { return enumNamesWithValues.contains(name); }
-llvm::Type *EnumType::generateLlvmType(std::unique_ptr<Context> &context) { return context->Builder->getInt32Ty(); }
+llvm::Type *EnumType::generateLlvmType(std::unique_ptr<Context> &context) { return context->builder()->getInt32Ty(); }
 llvm::Value *EnumType::generateFieldAccess(Token &token, llvm::Value *indexValue, std::unique_ptr<Context> &context)
 {
     throw CompilerException(ParserError{.token = token, .message = "EnumType does not support field access."});

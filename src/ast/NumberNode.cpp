@@ -14,7 +14,7 @@ void NumberNode::print() { std::cout << m_value; }
 
 llvm::Value *NumberNode::codegen(std::unique_ptr<Context> &context)
 {
-    return llvm::ConstantInt::get(*context->TheContext, llvm::APInt(static_cast<unsigned>(m_numBits), m_value));
+    return llvm::ConstantInt::get(*context->context(), llvm::APInt(static_cast<unsigned>(m_numBits), m_value));
 }
 
 std::shared_ptr<VariableType> NumberNode::resolveType([[maybe_unused]] const std::unique_ptr<UnitNode> &unit,

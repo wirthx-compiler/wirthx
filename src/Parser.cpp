@@ -1948,10 +1948,10 @@ std::unique_ptr<UnitNode> Parser::parseUnit(bool includeSystem)
             throw ParserException(m_errors);
         }
 
-        for (auto declaration: m_functionDeclarations)
+        for (const auto &declaration: m_functionDeclarations)
         {
             bool found = false;
-            for (auto def: m_functionDefinitions)
+            for (const auto &def: m_functionDefinitions)
             {
                 if (def->functionSignature() == declaration->functionSignature())
                 {
@@ -1980,7 +1980,7 @@ std::unique_ptr<UnitNode> Parser::parseProgram()
 {
     try
     {
-        UnitType unitType = UnitType::PROGRAM;
+        auto unitType = UnitType::PROGRAM;
 
 
         consume(TokenType::NAMEDTOKEN);

@@ -16,15 +16,15 @@ llvm::Value *AddressNode::codegen(std::unique_ptr<Context> &context)
 {
     const auto variableName = to_lower(m_variableName);
 
-    llvm::AllocaInst *allocatedValue = context->NamedAllocations[m_variableName];
+    const auto allocatedValue = context->namedAllocation(m_variableName);
 
     if (!allocatedValue)
     {
-        for (auto &arg: context->TopLevelFunction->args())
+        for (auto &arg: context->currentFunction()->args())
         {
             if (iequals(arg.getName(), variableName))
             {
-                return context->TopLevelFunction->getArg(arg.getArgNo());
+                return context->currentFunction()->getArg(arg.getArgNo());
             }
         }
 

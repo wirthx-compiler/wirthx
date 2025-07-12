@@ -18,19 +18,19 @@ void FieldAccessNode::print() {}
 
 llvm::Value *FieldAccessNode::codegen(std::unique_ptr<Context> &context)
 {
-    llvm::AllocaInst *V = context->NamedAllocations[m_elementName];
+    llvm::AllocaInst *V = context->namedAllocation(m_elementName);
 
     const auto fieldName = m_elementName + "." + m_fieldName;
     if (!V)
     {
-        for (size_t i = 0; i < context->TopLevelFunction->arg_size(); ++i)
+        for (size_t i = 0; i < context->currentFunction()->arg_size(); ++i)
         {
-            auto arg = context->TopLevelFunction->getArg(static_cast<unsigned>(i));
+            auto arg = context->currentFunction()->getArg(static_cast<unsigned>(i));
             if (arg->getName() == m_elementName)
             {
 
                 auto functionDefinition =
-                        context->ProgramUnit->getFunctionDefinition(context->TopLevelFunction->getName().str());
+                        context->programUnit()->getFunctionDefinition(context->currentFunction()->getName().str());
                 auto structDef = functionDefinition.value()->getParam(m_elementName);
 
                 if (!structDef)
@@ -47,37 +47,37 @@ llvm::Value *FieldAccessNode::codegen(std::unique_ptr<Context> &context)
                 if (arg->getType()->isStructTy())
                 {
                     llvm::AllocaInst *alloca =
-                            context->Builder->CreateAlloca(llvmRecordType, nullptr, m_elementName + "_ptr");
-                    context->Builder->CreateStore(arg, alloca);
+                            context->builder()->CreateAlloca(llvmRecordType, nullptr, m_elementName + "_ptr");
+                    context->builder()->CreateStore(arg, alloca);
 
                     value = alloca;
                 }
                 auto fieldType = field.variableType->generateLlvmType(context);
-                const llvm::DataLayout &DL = context->TheModule->getDataLayout();
+                const llvm::DataLayout &DL = context->module()->getDataLayout();
                 auto alignment = DL.getPrefTypeAlign(fieldType);
 
 
-                auto arrayValue = context->Builder->CreateStructGEP(llvmRecordType, value, index, fieldName);
+                auto arrayValue = context->builder()->CreateStructGEP(llvmRecordType, value, index, fieldName);
                 // if (fieldType->isPointerTy())
                 // {
                 //     return arrayValue;
                 // }
-                return context->Builder->CreateAlignedLoad(fieldType, arrayValue, alignment, fieldName);
+                return context->builder()->CreateAlignedLoad(fieldType, arrayValue, alignment, fieldName);
             }
         }
     }
     std::optional<VariableDefinition> structDef;
-    if (context->TopLevelFunction)
+    if (context->currentFunction())
     {
         auto functionDefinition =
-                context->ProgramUnit->getFunctionDefinition(context->TopLevelFunction->getName().str());
+                context->programUnit()->getFunctionDefinition(context->currentFunction()->getName().str());
         if (functionDefinition)
             structDef = functionDefinition.value()->body()->getVariableDefinition(m_elementName);
     }
 
     if (!structDef)
     {
-        structDef = context->ProgramUnit->getVariableDefinition(m_elementName);
+        structDef = context->programUnit()->getVariableDefinition(m_elementName);
     }
     if (!structDef)
     {
@@ -91,8 +91,8 @@ llvm::Value *FieldAccessNode::codegen(std::unique_ptr<Context> &context)
         auto field = recordType->getField(index);
 
 
-        auto arrayValue = context->Builder->CreateStructGEP(V->getAllocatedType(), V, index, fieldName);
-        return context->Builder->CreateLoad(field.variableType->generateLlvmType(context), arrayValue);
+        auto arrayValue = context->builder()->CreateStructGEP(V->getAllocatedType(), V, index, fieldName);
+        return context->builder()->CreateLoad(field.variableType->generateLlvmType(context), arrayValue);
     }
 }
 

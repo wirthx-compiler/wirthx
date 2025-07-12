@@ -25,23 +25,23 @@ void VariableAssignmentNode::print()
 llvm::Value *VariableAssignmentNode::codegen(std::unique_ptr<Context> &context)
 {
     // Look this variable up in the function.
-    llvm::Value *allocatedValue = context->NamedAllocations[m_variableName];
+    llvm::Value *allocatedValue = context->namedAllocation(m_variableName);
 
     llvm::Type *type = nullptr;
 
     if (!allocatedValue)
     {
-        for (auto &arg: context->TopLevelFunction->args())
+        for (auto &arg: context->currentFunction()->args())
         {
             if (arg.getName() == m_variableName)
             {
                 auto functionDefinition =
-                        context->ProgramUnit->getFunctionDefinition(context->TopLevelFunction->getName().str());
+                        context->programUnit()->getFunctionDefinition(context->currentFunction()->getName().str());
                 if (functionDefinition.has_value())
                 {
                     const auto argType = functionDefinition.value()->getParam(arg.getArgNo());
                     type = argType->type->generateLlvmType(context);
-                    const auto argValue = context->TopLevelFunction->getArg(arg.getArgNo());
+                    const auto argValue = context->currentFunction()->getArg(arg.getArgNo());
                     if (argType->isReference)
                     {
 
@@ -54,7 +54,7 @@ llvm::Value *VariableAssignmentNode::codegen(std::unique_ptr<Context> &context)
     }
     else
     {
-        type = context->NamedAllocations[m_variableName]->getAllocatedType();
+        type = context->namedAllocation(m_variableName)->getAllocatedType();
     }
 
 
@@ -66,20 +66,20 @@ llvm::Value *VariableAssignmentNode::codegen(std::unique_ptr<Context> &context)
 
     if (type->isIntegerTy() && expressionResult->getType()->isIntegerTy())
     {
-        const auto targetType = llvm::IntegerType::get(*context->TheContext, type->getIntegerBitWidth());
+        const auto targetType = llvm::IntegerType::get(*context->context(), type->getIntegerBitWidth());
         if (type->getIntegerBitWidth() != expressionResult->getType()->getIntegerBitWidth())
         {
-            expressionResult = context->Builder->CreateIntCast(expressionResult, targetType, true, "lhs_cast");
+            expressionResult = context->builder()->CreateIntCast(expressionResult, targetType, true, "lhs_cast");
         }
 
-        context->Builder->CreateStore(expressionResult, allocatedValue);
+        context->builder()->CreateStore(expressionResult, allocatedValue);
         // context->NamedValues[m_variableName] = expressionResult;
         return allocatedValue;
     }
     if (type->isIEEELikeFPTy() && expressionResult->getType()->isIEEELikeFPTy())
     {
-        allocatedValue = context->Builder->CreateFPCast(allocatedValue, expressionResult->getType());
-        context->Builder->CreateStore(expressionResult, allocatedValue);
+        allocatedValue = context->builder()->CreateFPCast(allocatedValue, expressionResult->getType());
+        context->builder()->CreateStore(expressionResult, allocatedValue);
         // context->NamedValues[m_variableName] = expressionResult;
         return allocatedValue;
     }
@@ -87,13 +87,13 @@ llvm::Value *VariableAssignmentNode::codegen(std::unique_ptr<Context> &context)
     if (type->isStructTy() && expressionResult->getType()->isPointerTy())
     {
         // we might have to free the value
-        auto variable_definition = context->ProgramUnit->getVariableDefinition(m_variableName);
+        auto variable_definition = context->programUnit()->getVariableDefinition(m_variableName);
         std::shared_ptr<VariableType> varType =
                 (variable_definition) ? variable_definition.value().variableType : nullptr;
-        if (context->TopLevelFunction && !variable_definition)
+        if (context->currentFunction() && !variable_definition)
         {
             if (const auto def =
-                        context->ProgramUnit->getFunctionDefinition(context->TopLevelFunction->getName().str()))
+                        context->programUnit()->getFunctionDefinition(context->currentFunction()->getName().str()))
             {
                 variable_definition = def.value()->body()->getVariableDefinition(m_variableName);
 
@@ -112,31 +112,31 @@ llvm::Value *VariableAssignmentNode::codegen(std::unique_ptr<Context> &context)
         // {
         //     auto stringStructPtr = allocatedValue;
         //     const auto arrayPointerOffset =
-        //             context->Builder->CreateStructGEP(type, stringStructPtr, 2, m_variableName + ".ptr.offset");
-        //     // auto strValuePtr = context->Builder->CreateLoad(llvm::PointerType::getUnqual(*context->TheContext),
+        //             context->builder()->CreateStructGEP(type, stringStructPtr, 2, m_variableName + ".ptr.offset");
+        //     // auto strValuePtr = context->builder()->CreateLoad(llvm::PointerType::getUnqual(*context->context()),
         //     //                                                 arrayPointerOffset, m_variableName + ".loaded");
         //
-        //     context->Builder->CreateCall(context->TheModule->getFunction("freemem(integer8_ptr)"),
+        //     context->builder()->CreateCall(context->module()->getFunction("freemem(integer8_ptr)"),
         //                                  llvm::ArrayRef<llvm::Value *>{arrayPointerOffset});
         // }
 
         auto llvmArgType = type;
 
         auto memcpyCall = llvm::Intrinsic::getDeclaration(
-                context->TheModule.get(), llvm::Intrinsic::memcpy,
-                {context->Builder->getPtrTy(), context->Builder->getPtrTy(), context->Builder->getInt64Ty()});
+                context->module().get(), llvm::Intrinsic::memcpy,
+                {context->builder()->getPtrTy(), context->builder()->getPtrTy(), context->builder()->getInt64Ty()});
         std::vector<llvm::Value *> memcopyArgs;
 
-        const llvm::DataLayout &DL = context->TheModule->getDataLayout();
+        const llvm::DataLayout &DL = context->module()->getDataLayout();
         uint64_t structSize = DL.getTypeAllocSize(llvmArgType);
 
 
-        memcopyArgs.push_back(context->Builder->CreateBitCast(allocatedValue, context->Builder->getPtrTy()));
-        memcopyArgs.push_back(context->Builder->CreateBitCast(expressionResult, context->Builder->getPtrTy()));
-        memcopyArgs.push_back(context->Builder->getInt64(structSize));
-        memcopyArgs.push_back(context->Builder->getFalse());
+        memcopyArgs.push_back(context->builder()->CreateBitCast(allocatedValue, context->builder()->getPtrTy()));
+        memcopyArgs.push_back(context->builder()->CreateBitCast(expressionResult, context->builder()->getPtrTy()));
+        memcopyArgs.push_back(context->builder()->getInt64(structSize));
+        memcopyArgs.push_back(context->builder()->getFalse());
 
-        context->Builder->CreateCall(memcpyCall, memcopyArgs);
+        context->builder()->CreateCall(memcpyCall, memcopyArgs);
 
         return expressionResult;
     }
@@ -144,38 +144,38 @@ llvm::Value *VariableAssignmentNode::codegen(std::unique_ptr<Context> &context)
     {
         if (llvm::isa<llvm::AllocaInst>(expressionResult))
         {
-            context->NamedAllocations[m_variableName] = llvm::cast<llvm::AllocaInst>(expressionResult);
+            context->setNamedAllocation(m_variableName, llvm::cast<llvm::AllocaInst>(expressionResult));
             return expressionResult;
         }
 
         if (m_dereference)
         {
-            const auto expressionType = m_expression->resolveType(context->ProgramUnit, resolveParent(context));
-            const auto dereferenced = context->Builder->CreateLoad(context->Builder->getPtrTy(), allocatedValue,
-                                                                   "deref." + m_variableName);
+            const auto expressionType = m_expression->resolveType(context->programUnit(), resolveParent(context));
+            const auto dereferenced = context->builder()->CreateLoad(context->builder()->getPtrTy(), allocatedValue,
+                                                                     "deref." + m_variableName);
             if (expressionType->baseType == VariableBaseType::String)
             {
 
-                const auto arrayPointerOffset = context->Builder->CreateStructGEP(
+                const auto arrayPointerOffset = context->builder()->CreateStructGEP(
                         expressionType->generateLlvmType(context), expressionResult, 2, "string.ptr.offset");
-                context->Builder->CreateStore(
-                        context->Builder->CreateLoad(llvm::PointerType::getUnqual(*context->TheContext),
-                                                     arrayPointerOffset),
+                context->builder()->CreateStore(
+                        context->builder()->CreateLoad(llvm::PointerType::getUnqual(*context->context()),
+                                                       arrayPointerOffset),
                         dereferenced);
             }
             else
             {
-                context->Builder->CreateStore(expressionResult, dereferenced);
+                context->builder()->CreateStore(expressionResult, dereferenced);
             }
             return expressionResult;
         }
 
-        // auto resultType = m_expression->resolveType(context->ProgramUnit, resolveParent(context));
+        // auto resultType = m_expression->resolveType(context->programUnit(), resolveParent(context));
 
-        // expressionResult = context->Builder->CreateLoad(resultType->generateLlvmType(context), expressionResult);
+        // expressionResult = context->builder()->CreateLoad(resultType->generateLlvmType(context), expressionResult);
     }
 
-    context->Builder->CreateStore(expressionResult, allocatedValue);
+    context->builder()->CreateStore(expressionResult, allocatedValue);
     return expressionResult;
 }
 void VariableAssignmentNode::typeCheck(const std::unique_ptr<UnitNode> &unit, ASTNode *parentNode)

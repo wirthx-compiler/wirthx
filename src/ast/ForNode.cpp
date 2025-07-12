@@ -27,16 +27,16 @@ llvm::Value *ForNode::codegen(std::unique_ptr<Context> &context)
     if (!startValue)
         return nullptr;
 
-    auto &builder = context->Builder;
-    auto &llvmContext = context->TheContext;
+    auto &builder = context->builder();
+    auto &llvmContext = context->context();
     // Make the new basic block for the loop header, inserting after current
     // block.
     // Within the loop, the variable is defined equal to the PHI node.  If it
     // shadows an existing variable, we have to restore it, so save it now.
-    // auto *oldValue = context->NamedAllocations[m_loopVariable];
+    // auto *oldValue = context->namedAllocation(context->NamedAllocations[m_loopVariable]);
     // if (!oldValue)
     //     return nullptr;
-    // builder->CreateStore(startValue, context->NamedAllocations[m_loopVariable]);
+    // builder->CreateStore(startValue, context->namedAllocation(context->NamedAllocations[m_loopVariable]));
 
     llvm::Function *TheFunction = builder->GetInsertBlock()->getParent();
     llvm::BasicBlock *preheaderBB = builder->GetInsertBlock();
@@ -59,14 +59,14 @@ llvm::Value *ForNode::codegen(std::unique_ptr<Context> &context)
 
     if (startValue->getType()->getIntegerBitWidth() != bitLength)
     {
-        startValue = context->Builder->CreateIntCast(startValue, targetType, true, "startValue_cast");
+        startValue = context->builder()->CreateIntCast(startValue, targetType, true, "startValue_cast");
     }
     Variable->addIncoming(startValue, preheaderBB);
 
-    context->NamedValues[m_loopVariable] = Variable;
+    context->setNamedValue(m_loopVariable, Variable);
 
-    context->BreakBlock.Block = afterBB;
-    context->BreakBlock.BlockUsed = false;
+    context->breakBlock().Block = afterBB;
+    context->breakBlock().BlockUsed = false;
 
     // Emit the body of the loop.  This, like any other expr, can change the
     // current BB.  Note that we ignore the value computed by the body, but don't
@@ -76,26 +76,26 @@ llvm::Value *ForNode::codegen(std::unique_ptr<Context> &context)
         builder->SetInsertPoint(loopBB);
         exp->codegen(context);
     }
-    context->BreakBlock.Block = nullptr;
+    context->breakBlock().Block = nullptr;
     // Emit the step value.
     llvm::Value *stepValue = builder->getIntN(bitLength, m_increment);
 
     llvm::Value *nextVar = builder->CreateAdd(Variable, stepValue, "nextvar");
-    // builder->CreateStore(nextVar, context->NamedAllocations[m_loopVariable]);
+    // builder->CreateStore(nextVar, context->namedAllocation(context->NamedAllocations[m_loopVariable]));
     //  Compute the end condition.
     llvm::Value *EndCond = m_endExpression->codegen(context);
     if (!EndCond)
         return nullptr;
     if (EndCond->getType()->getIntegerBitWidth() != bitLength)
     {
-        EndCond = context->Builder->CreateIntCast(EndCond, targetType, true, "lhs_cast");
+        EndCond = context->builder()->CreateIntCast(EndCond, targetType, true, "lhs_cast");
     }
 
     // Convert condition to a bool by comparing non-equal to 0.0.
     if (m_increment > 0)
-        EndCond = context->Builder->CreateCmp(llvm::CmpInst::ICMP_SLE, nextVar, EndCond, "for.loopcond");
+        EndCond = context->builder()->CreateCmp(llvm::CmpInst::ICMP_SLE, nextVar, EndCond, "for.loopcond");
     else
-        EndCond = context->Builder->CreateCmp(llvm::CmpInst::ICMP_SGE, nextVar, EndCond, "for.loopcond");
+        EndCond = context->builder()->CreateCmp(llvm::CmpInst::ICMP_SGE, nextVar, EndCond, "for.loopcond");
 
     // Create the "after loop" block and insert it.
     llvm::BasicBlock *loopEndBB = builder->GetInsertBlock();
@@ -110,7 +110,7 @@ llvm::Value *ForNode::codegen(std::unique_ptr<Context> &context)
     Variable->addIncoming(nextVar, loopEndBB);
 
     // Restore the unshadowed variable.
-    // context->NamedAllocations[m_loopVariable] = result;
+    // context->namedAllocation(context->NamedAllocations[m_loopVariable]) = result;
 
     // for expr always returns 0.0.
     return llvm::Constant::getNullValue(llvm::Type::getInt64Ty(*llvmContext));

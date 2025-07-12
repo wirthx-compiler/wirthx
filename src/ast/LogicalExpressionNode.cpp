@@ -53,11 +53,11 @@ llvm::Value *LogicalExpressionNode::codegen(std::unique_ptr<Context> &context)
     switch (m_operator)
     {
         case LogicalOperator::AND:
-            return context->Builder->CreateAnd(m_lhs->codegen(context), m_rhs->codegen(context));
+            return context->builder()->CreateAnd(m_lhs->codegen(context), m_rhs->codegen(context));
         case LogicalOperator::OR:
-            return context->Builder->CreateOr(m_lhs->codegen(context), m_rhs->codegen(context));
+            return context->builder()->CreateOr(m_lhs->codegen(context), m_rhs->codegen(context));
         case LogicalOperator::NOT:
-            return context->Builder->CreateNot(m_rhs->codegen(context));
+            return context->builder()->CreateNot(m_rhs->codegen(context));
         default:
             assert(false && "unknown logical operator");
     }

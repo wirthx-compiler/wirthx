@@ -8,7 +8,7 @@ DoubleNode::DoubleNode(const Token &token, const double value) : ASTNode(token),
 void DoubleNode::print() {}
 llvm::Value *DoubleNode::codegen(std::unique_ptr<Context> &context)
 {
-    return llvm::ConstantFP::get(context->Builder->getDoubleTy(), m_value);
+    return llvm::ConstantFP::get(context->builder()->getDoubleTy(), m_value);
 }
 std::shared_ptr<VariableType> DoubleNode::resolveType(const std::unique_ptr<UnitNode> &unit, ASTNode *parentNode)
 {

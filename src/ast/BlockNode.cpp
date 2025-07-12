@@ -38,7 +38,7 @@ void BlockNode::codegenConstantDefinitions(std::unique_ptr<Context> &context)
     {
         if (def.constant)
         {
-            context->NamedValues[def.variableName] = def.generateCodeForConstant(context);
+            context->setNamedValue(def.variableName, def.generateCodeForConstant(context));
         }
     }
 }
@@ -49,9 +49,9 @@ llvm::Value *BlockNode::codegen(std::unique_ptr<Context> &context)
     {
 
         // Create a new basic block to start insertion into.
-        llvm::BasicBlock *BB = llvm::BasicBlock::Create(*context->TheContext, m_blockname, context->TopLevelFunction);
+        llvm::BasicBlock *BB = llvm::BasicBlock::Create(*context->context(), m_blockname, context->currentFunction());
 
-        context->Builder->SetInsertPoint(BB);
+        context->builder()->SetInsertPoint(BB);
     }
     codegenConstantDefinitions(context);
 
@@ -60,10 +60,10 @@ llvm::Value *BlockNode::codegen(std::unique_ptr<Context> &context)
         if (!def.constant)
 
         {
-            context->NamedAllocations[def.variableName] = def.generateCode(context);
+            context->setNamedAllocation(def.variableName, def.generateCode(context));
             if (!def.alias.empty())
             {
-                context->NamedAllocations[def.alias] = context->NamedAllocations[def.variableName];
+                context->setNamedAllocation(def.alias, context->namedAllocation(def.variableName));
             }
             if (def.value)
             {
@@ -72,37 +72,37 @@ llvm::Value *BlockNode::codegen(std::unique_ptr<Context> &context)
                 const auto type = def.variableType->generateLlvmType(context);
                 if (result->getType()->isIntegerTy())
                 {
-                    result = context->Builder->CreateIntCast(result, type, true);
+                    result = context->builder()->CreateIntCast(result, type, true);
                 }
                 else if (type->isIEEELikeFPTy())
                 {
-                    result = context->Builder->CreateFPCast(result, type);
+                    result = context->builder()->CreateFPCast(result, type);
                 }
                 if (type->isStructTy() && result->getType()->isPointerTy())
                 {
                     auto llvmArgType = type;
 
-                    auto memcpyCall =
-                            llvm::Intrinsic::getDeclaration(context->TheModule.get(), llvm::Intrinsic::memcpy,
-                                                            {context->Builder->getPtrTy(), context->Builder->getPtrTy(),
-                                                             context->Builder->getInt64Ty()});
+                    auto memcpyCall = llvm::Intrinsic::getDeclaration(context->module().get(), llvm::Intrinsic::memcpy,
+                                                                      {context->builder()->getPtrTy(),
+                                                                       context->builder()->getPtrTy(),
+                                                                       context->builder()->getInt64Ty()});
                     std::vector<llvm::Value *> memcopyArgs;
 
-                    const llvm::DataLayout &DL = context->TheModule->getDataLayout();
+                    const llvm::DataLayout &DL = context->module()->getDataLayout();
                     uint64_t structSize = DL.getTypeAllocSize(llvmArgType);
 
 
-                    memcopyArgs.push_back(context->Builder->CreateBitCast(context->NamedAllocations[def.variableName],
-                                                                          context->Builder->getPtrTy()));
-                    memcopyArgs.push_back(context->Builder->CreateBitCast(result, context->Builder->getPtrTy()));
-                    memcopyArgs.push_back(context->Builder->getInt64(structSize));
-                    memcopyArgs.push_back(context->Builder->getFalse());
+                    memcopyArgs.push_back(context->builder()->CreateBitCast(context->namedAllocation(def.variableName),
+                                                                            context->builder()->getPtrTy()));
+                    memcopyArgs.push_back(context->builder()->CreateBitCast(result, context->builder()->getPtrTy()));
+                    memcopyArgs.push_back(context->builder()->getInt64(structSize));
+                    memcopyArgs.push_back(context->builder()->getFalse());
 
-                    context->Builder->CreateCall(memcpyCall, memcopyArgs);
+                    context->builder()->CreateCall(memcpyCall, memcopyArgs);
                 }
                 else
                 {
-                    context->Builder->CreateStore(result, context->NamedAllocations[def.variableName]);
+                    context->builder()->CreateStore(result, context->namedAllocation(def.variableName));
                 }
             }
         }
@@ -114,33 +114,17 @@ llvm::Value *BlockNode::codegen(std::unique_ptr<Context> &context)
         values.push_back(exp->codegen(context));
     }
 
-    auto topLevelFunctionName = (context->TopLevelFunction) ? context->TopLevelFunction->getName().str() : "";
-    if (context->TopLevelFunction)
+    auto topLevelFunctionName = (context->currentFunction()) ? context->currentFunction()->getName().str() : "";
+    if (context->currentFunction())
         topLevelFunctionName = topLevelFunctionName.substr(0, topLevelFunctionName.find('('));
     for (auto &def: m_variableDefinitions)
     {
-
-        // if (def.variableType->baseType == VariableBaseType::String)
-        // {
-        //     auto stringStructPtr = context->NamedAllocations[def.variableName];
-        //     auto type = def.variableType;
-        //     const auto arrayPointerOffset = context->Builder->CreateStructGEP(type->generateLlvmType(context),
-        //                                                                       stringStructPtr, 2,
-        //                                                                       "string.ptr.offset");
-        //     // auto strValuePtr = context->Builder->CreateLoad(llvm::PointerType::getUnqual(*context->TheContext),
-        //     //                                                 arrayPointerOffset);
-        //
-        //     // context->Builder->CreateCall(context->TheModule->getFunction("free"), strValuePtr);
-        //     context->Builder->CreateLifetimeEnd(arrayPointerOffset); // End lifetime for the string allocation
-        // }
-
-        if (!context->TopLevelFunction || !iequals(def.variableName, topLevelFunctionName))
+        if (!context->currentFunction() || !iequals(def.variableName, topLevelFunctionName))
         {
-            context->NamedValues.erase(def.variableName);
-            context->NamedAllocations.erase(def.variableName);
+            context->removeName(def.variableName);
         }
     }
-    return llvm::Constant::getNullValue(llvm::Type::getDoubleTy(*context->TheContext));
+    return llvm::Constant::getNullValue(llvm::Type::getDoubleTy(*context->context()));
 }
 
 std::optional<VariableDefinition> BlockNode::getVariableDefinition(const std::string &name) const

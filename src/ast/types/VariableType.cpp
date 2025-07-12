@@ -48,15 +48,15 @@ llvm::Type *VariableType::generateLlvmType(std::unique_ptr<Context> &context)
     switch (this->baseType)
     {
         case VariableBaseType::Pointer:
-            return llvm::PointerType::getUnqual(*context->TheContext);
+            return llvm::PointerType::getUnqual(*context->context());
         case VariableBaseType::Float:
-            return llvm::Type::getFloatTy(*context->TheContext);
+            return llvm::Type::getFloatTy(*context->context());
         case VariableBaseType::Double:
-            return llvm::Type::getDoubleTy(*context->TheContext);
+            return llvm::Type::getDoubleTy(*context->context());
         case VariableBaseType::Boolean:
-            return llvm::Type::getInt1Ty(*context->TheContext);
+            return llvm::Type::getInt1Ty(*context->context());
         case VariableBaseType::Character:
-            return llvm::Type::getInt8Ty(*context->TheContext);
+            return llvm::Type::getInt8Ty(*context->context());
         default:
             assert(false && "unknown base type to generate llvm type for");
             return nullptr;
@@ -111,7 +111,7 @@ std::shared_ptr<VariableType> VariableType::getPointer()
 bool VariableType::operator==(const VariableType &other) const { return this->baseType == other.baseType; }
 llvm::Value *FieldAccessableType::getLowValue(std::unique_ptr<Context> &context)
 {
-    return context->Builder->getInt64(0);
+    return context->builder()->getInt64(0);
 }
 
 
@@ -139,5 +139,5 @@ llvm::Type *PointerType::generateLlvmType(std::unique_ptr<Context> &context)
         const auto llvmBaseType = pointerBase->generateLlvmType(context);
         return llvm::PointerType::getUnqual(llvmBaseType);
     }
-    return llvm::PointerType::getUnqual(*context->TheContext);
+    return llvm::PointerType::getUnqual(*context->context());
 }

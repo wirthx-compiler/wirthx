@@ -12,7 +12,7 @@ namespace llvm
     class Value;
 
 };
-struct Context;
+class Context;
 
 namespace codegen
 {

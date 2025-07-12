@@ -19,21 +19,21 @@ void CaseNode::print() {}
 llvm::Value *CaseNode::codegen_constants(std::unique_ptr<Context> &context)
 {
     const auto value = m_selector->codegen(context);
-    auto function = context->Builder->GetInsertBlock()->getParent();
-    llvm::BasicBlock *defaultBlock = llvm::BasicBlock::Create(*context->TheContext, "default", function);
-    llvm::BasicBlock *endBlock = llvm::BasicBlock::Create(*context->TheContext, "caseEnd", function);
-    const auto switchInstruction = context->Builder->CreateSwitch(value, defaultBlock, m_selectors.size() + 1);
+    auto function = context->builder()->GetInsertBlock()->getParent();
+    llvm::BasicBlock *defaultBlock = llvm::BasicBlock::Create(*context->context(), "default", function);
+    llvm::BasicBlock *endBlock = llvm::BasicBlock::Create(*context->context(), "caseEnd", function);
+    const auto switchInstruction = context->builder()->CreateSwitch(value, defaultBlock, m_selectors.size() + 1);
     for (const auto &[selectorNode, expression]: m_selectors)
     {
 
-        const auto selectorBlock = llvm::BasicBlock::Create(*context->TheContext, "case", function);
-        context->Builder->SetInsertPoint(selectorBlock);
+        const auto selectorBlock = llvm::BasicBlock::Create(*context->context(), "case", function);
+        context->builder()->SetInsertPoint(selectorBlock);
         expression->codegen(context);
-        context->Builder->CreateBr(endBlock);
+        context->builder()->CreateBr(endBlock);
         const auto selectorValue = selectorNode->codegen(context);
         switchInstruction->addCase(llvm::cast<llvm::ConstantInt>(selectorValue), selectorBlock);
     }
-    context->Builder->SetInsertPoint(defaultBlock);
+    context->builder()->SetInsertPoint(defaultBlock);
     if (!m_elseExpressions.empty())
     {
         for (const auto &elseExpression: m_elseExpressions)
@@ -41,20 +41,20 @@ llvm::Value *CaseNode::codegen_constants(std::unique_ptr<Context> &context)
             elseExpression->codegen(context);
         }
     }
-    context->Builder->CreateBr(endBlock);
+    context->builder()->CreateBr(endBlock);
 
-    context->Builder->SetInsertPoint(endBlock);
+    context->builder()->SetInsertPoint(endBlock);
 
     return nullptr;
 }
 llvm::Value *CaseNode::codegen_strings(std::unique_ptr<Context> &context)
 {
-    const auto function = context->Builder->GetInsertBlock()->getParent();
+    const auto function = context->builder()->GetInsertBlock()->getParent();
 
     const auto value = m_selector->codegen(context);
-    const auto compareFunction = context->TheModule->getFunction("comparestr(string,string)");
-    const auto defaultBlock = llvm::BasicBlock::Create(*context->TheContext, "caseDefault", function);
-    llvm::BasicBlock *endBlock = llvm::BasicBlock::Create(*context->TheContext, "caseEnd", function);
+    const auto compareFunction = context->module()->getFunction("comparestr(string,string)");
+    const auto defaultBlock = llvm::BasicBlock::Create(*context->context(), "caseDefault", function);
+    llvm::BasicBlock *endBlock = llvm::BasicBlock::Create(*context->context(), "caseEnd", function);
 
 
     llvm::BasicBlock *nextCaseBlock = nullptr;
@@ -65,30 +65,30 @@ llvm::Value *CaseNode::codegen_strings(std::unique_ptr<Context> &context)
 
         std::vector arguments = {value, selectorValue};
 
-        const auto lhs = context->Builder->CreateCall(compareFunction, arguments);
-        const auto rhs = context->Builder->getInt32(0);
-        const auto condition = context->Builder->CreateICmpEQ(lhs, rhs);
-        const auto selectorTrueBlock = llvm::BasicBlock::Create(*context->TheContext, "caseTrue", function);
+        const auto lhs = context->builder()->CreateCall(compareFunction, arguments);
+        const auto rhs = context->builder()->getInt32(0);
+        const auto condition = context->builder()->CreateICmpEQ(lhs, rhs);
+        const auto selectorTrueBlock = llvm::BasicBlock::Create(*context->context(), "caseTrue", function);
         if (caseIndex == m_selectors.size() - 1)
         {
             nextCaseBlock = defaultBlock;
         }
         else
         {
-            nextCaseBlock = llvm::BasicBlock::Create(*context->TheContext, "caseFalse", function);
+            nextCaseBlock = llvm::BasicBlock::Create(*context->context(), "caseFalse", function);
         }
-        context->Builder->CreateCondBr(condition, selectorTrueBlock, nextCaseBlock);
-        context->Builder->SetInsertPoint(selectorTrueBlock);
+        context->builder()->CreateCondBr(condition, selectorTrueBlock, nextCaseBlock);
+        context->builder()->SetInsertPoint(selectorTrueBlock);
         expression->codegen(context);
-        context->Builder->CreateBr(endBlock);
+        context->builder()->CreateBr(endBlock);
         if (caseIndex < m_selectors.size() - 1)
         {
-            context->Builder->SetInsertPoint(nextCaseBlock);
+            context->builder()->SetInsertPoint(nextCaseBlock);
         }
         caseIndex++;
     }
 
-    context->Builder->SetInsertPoint(defaultBlock);
+    context->builder()->SetInsertPoint(defaultBlock);
     if (!m_elseExpressions.empty())
     {
         for (const auto &elseExpression: m_elseExpressions)
@@ -96,9 +96,9 @@ llvm::Value *CaseNode::codegen_strings(std::unique_ptr<Context> &context)
             elseExpression->codegen(context);
         }
     }
-    context->Builder->CreateBr(endBlock);
+    context->builder()->CreateBr(endBlock);
 
-    context->Builder->SetInsertPoint(endBlock);
+    context->builder()->SetInsertPoint(endBlock);
 
     return nullptr;
 }
@@ -106,28 +106,28 @@ llvm::Value *CaseNode::compareSelectorAndValue(llvm::Value *value, const std::sh
                                                std::unique_ptr<Context> &context)
 {
 
-    const auto selectorType = selector->resolveType(context->ProgramUnit, resolveParent(context));
+    const auto selectorType = selector->resolveType(context->programUnit(), resolveParent(context));
 
     if (const auto range = std::dynamic_pointer_cast<ValueRangeType>(selectorType))
     {
 
-        return context->Builder->CreateAnd(
-                context->Builder->CreateICmpSGE(value,
+        return context->builder()->CreateAnd(
+                context->builder()->CreateICmpSGE(value,
                                                 range->generateLowerBounds(selector->expressionToken(), context)),
-                context->Builder->CreateICmpSLE(value,
+                context->builder()->CreateICmpSLE(value,
                                                 range->generateUpperBounds(selector->expressionToken(), context)));
     }
 
     const auto selectorValue = selector->codegen(context);
-    return context->Builder->CreateICmpEQ(value, selectorValue);
+    return context->builder()->CreateICmpEQ(value, selectorValue);
 }
 llvm::Value *CaseNode::codegen_ranges(std::unique_ptr<Context> &context)
 {
-    const auto function = context->Builder->GetInsertBlock()->getParent();
+    const auto function = context->builder()->GetInsertBlock()->getParent();
 
     const auto value = m_selector->codegen(context);
-    const auto defaultBlock = llvm::BasicBlock::Create(*context->TheContext, "caseDefault", function);
-    llvm::BasicBlock *endBlock = llvm::BasicBlock::Create(*context->TheContext, "caseEnd", function);
+    const auto defaultBlock = llvm::BasicBlock::Create(*context->context(), "caseDefault", function);
+    llvm::BasicBlock *endBlock = llvm::BasicBlock::Create(*context->context(), "caseEnd", function);
 
 
     llvm::BasicBlock *nextCaseBlock = nullptr;
@@ -136,30 +136,30 @@ llvm::Value *CaseNode::codegen_ranges(std::unique_ptr<Context> &context)
     {
 
         const auto lhs = compareSelectorAndValue(value, selectorNode, context);
-        const auto rhs = context->Builder->getTrue();
-        const auto condition = context->Builder->CreateICmpEQ(lhs, rhs);
-        const auto selectorTrueBlock = llvm::BasicBlock::Create(*context->TheContext, "caseTrue", function);
+        const auto rhs = context->builder()->getTrue();
+        const auto condition = context->builder()->CreateICmpEQ(lhs, rhs);
+        const auto selectorTrueBlock = llvm::BasicBlock::Create(*context->context(), "caseTrue", function);
         if (caseIndex == m_selectors.size() - 1)
         {
             nextCaseBlock = defaultBlock;
         }
         else
         {
-            nextCaseBlock = llvm::BasicBlock::Create(*context->TheContext, "caseFalse", function);
+            nextCaseBlock = llvm::BasicBlock::Create(*context->context(), "caseFalse", function);
         }
-        context->Builder->CreateCondBr(condition, selectorTrueBlock, nextCaseBlock);
-        context->Builder->SetInsertPoint(selectorTrueBlock);
+        context->builder()->CreateCondBr(condition, selectorTrueBlock, nextCaseBlock);
+        context->builder()->SetInsertPoint(selectorTrueBlock);
         expression->codegen(context);
-        context->Builder->CreateBr(endBlock);
+        context->builder()->CreateBr(endBlock);
         if (caseIndex < m_selectors.size() - 1)
         {
 
-            context->Builder->SetInsertPoint(nextCaseBlock);
+            context->builder()->SetInsertPoint(nextCaseBlock);
         }
         caseIndex++;
     }
 
-    context->Builder->SetInsertPoint(defaultBlock);
+    context->builder()->SetInsertPoint(defaultBlock);
     if (!m_elseExpressions.empty())
     {
         for (const auto &elseExpression: m_elseExpressions)
@@ -167,9 +167,9 @@ llvm::Value *CaseNode::codegen_ranges(std::unique_ptr<Context> &context)
             elseExpression->codegen(context);
         }
     }
-    context->Builder->CreateBr(endBlock);
+    context->builder()->CreateBr(endBlock);
 
-    context->Builder->SetInsertPoint(endBlock);
+    context->builder()->SetInsertPoint(endBlock);
 
     return nullptr;
 }
@@ -184,8 +184,8 @@ bool CaseNode::oneSelectorHasARangeType(const std::unique_ptr<UnitNode> &unit, A
 }
 llvm::Value *CaseNode::codegen(std::unique_ptr<Context> &context)
 {
-    const auto selectorType = m_selector->resolveType(context->ProgramUnit, resolveParent(context));
-    if (oneSelectorHasARangeType(context->ProgramUnit, resolveParent(context)))
+    const auto selectorType = m_selector->resolveType(context->programUnit(), resolveParent(context));
+    if (oneSelectorHasARangeType(context->programUnit(), resolveParent(context)))
     {
         return codegen_ranges(context);
     }

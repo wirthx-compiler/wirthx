@@ -102,17 +102,17 @@ llvm::Value *ComparrisionNode::codegen(std::unique_ptr<Context> &context)
         }
     }
 
-    ASTNode *parent = context->ProgramUnit.get();
-    if (context->TopLevelFunction)
+    ASTNode *parent = context->programUnit().get();
+    if (context->currentFunction())
     {
-        if (auto def = context->ProgramUnit->getFunctionDefinition(context->TopLevelFunction->getName().str()))
+        if (auto def = context->programUnit()->getFunctionDefinition(context->currentFunction()->getName().str()))
         {
             parent = def.value().get();
         }
     }
 
-    auto lhsType = m_lhs->resolveType(context->ProgramUnit, parent);
-    auto rhsType = m_rhs->resolveType(context->ProgramUnit, parent);
+    auto lhsType = m_lhs->resolveType(context->programUnit(), parent);
+    auto rhsType = m_rhs->resolveType(context->programUnit(), parent);
 
     if (*lhsType == *rhsType && lhsType->baseType == VariableBaseType::Integer)
     {
@@ -120,56 +120,56 @@ llvm::Value *ComparrisionNode::codegen(std::unique_ptr<Context> &context)
         {
             const unsigned maxBitWith =
                     std::max(lhs->getType()->getIntegerBitWidth(), rhs->getType()->getIntegerBitWidth());
-            const auto targetType = llvm::IntegerType::get(*context->TheContext, maxBitWith);
+            const auto targetType = llvm::IntegerType::get(*context->context(), maxBitWith);
             if (maxBitWith != lhs->getType()->getIntegerBitWidth())
             {
-                lhs = context->Builder->CreateIntCast(lhs, targetType, true, "lhs_cast");
+                lhs = context->builder()->CreateIntCast(lhs, targetType, true, "lhs_cast");
             }
             if (maxBitWith != rhs->getType()->getIntegerBitWidth())
             {
-                rhs = context->Builder->CreateIntCast(rhs, targetType, true, "rhs_cast");
+                rhs = context->builder()->CreateIntCast(rhs, targetType, true, "rhs_cast");
             }
         }
     }
     else if (lhsType->baseType == VariableBaseType::Pointer || rhsType->baseType == VariableBaseType::Pointer)
     {
-        auto targetType = llvm::IntegerType::getInt64Ty(*context->TheContext);
+        auto targetType = llvm::IntegerType::getInt64Ty(*context->context());
         const unsigned maxBitWith = targetType->getIntegerBitWidth();
         if (lhsType->baseType == VariableBaseType::Pointer)
         {
-            lhs = context->Builder->CreateBitOrPointerCast(lhs, targetType);
+            lhs = context->builder()->CreateBitOrPointerCast(lhs, targetType);
         }
         else if (lhsType->baseType == VariableBaseType::Integer)
         {
-            lhs = context->Builder->CreateIntCast(lhs, targetType, true, "lhs_cast");
+            lhs = context->builder()->CreateIntCast(lhs, targetType, true, "lhs_cast");
         }
         if (rhsType->baseType == VariableBaseType::Pointer)
         {
-            rhs = context->Builder->CreateBitOrPointerCast(rhs, targetType);
+            rhs = context->builder()->CreateBitOrPointerCast(rhs, targetType);
         }
         else if (lhsType->baseType == VariableBaseType::Integer)
         {
-            rhs = context->Builder->CreateIntCast(rhs, targetType, true, "rhs_cast");
+            rhs = context->builder()->CreateIntCast(rhs, targetType, true, "rhs_cast");
         }
 
         if (maxBitWith != lhs->getType()->getIntegerBitWidth())
         {
-            lhs = context->Builder->CreateIntCast(lhs, targetType, true, "lhs_cast");
+            lhs = context->builder()->CreateIntCast(lhs, targetType, true, "lhs_cast");
         }
         if (maxBitWith != rhs->getType()->getIntegerBitWidth())
         {
-            rhs = context->Builder->CreateIntCast(rhs, targetType, true, "rhs_cast");
+            rhs = context->builder()->CreateIntCast(rhs, targetType, true, "rhs_cast");
         }
     }
     else if (lhsType && (lhsType->baseType == VariableBaseType::Float or lhsType->baseType == VariableBaseType::Double))
     {
         if (lhs->getType()->isFloatTy() && rhs->getType()->isDoubleTy())
         {
-            lhs = context->Builder->CreateFPCast(lhs, rhs->getType());
+            lhs = context->builder()->CreateFPCast(lhs, rhs->getType());
         }
         else if (lhs->getType()->isDoubleTy() && rhs->getType()->isFloatTy())
         {
-            lhs = context->Builder->CreateFPCast(rhs, lhs->getType());
+            lhs = context->builder()->CreateFPCast(rhs, lhs->getType());
         }
     }
     else
@@ -177,17 +177,17 @@ llvm::Value *ComparrisionNode::codegen(std::unique_ptr<Context> &context)
         if (lhsType && lhsType->baseType == VariableBaseType::String)
         {
 
-            if (llvm::Function *CalleeF = context->TheModule->getFunction("comparestr(string,string)"))
+            if (llvm::Function *CalleeF = context->module()->getFunction("comparestr(string,string)"))
             {
                 std::vector<llvm::Value *> ArgsV = {lhs, rhs};
 
-                lhs = context->Builder->CreateCall(CalleeF, ArgsV);
-                rhs = context->Builder->getInt32(0);
+                lhs = context->builder()->CreateCall(CalleeF, ArgsV);
+                rhs = context->builder()->getInt32(0);
             }
         }
     }
 
-    return context->Builder->CreateCmp(pred, lhs, rhs);
+    return context->builder()->CreateCmp(pred, lhs, rhs);
 }
 void ComparrisionNode::typeCheck(const std::unique_ptr<UnitNode> &unit, ASTNode *parentNode)
 {

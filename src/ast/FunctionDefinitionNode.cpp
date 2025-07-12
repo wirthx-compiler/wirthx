@@ -88,7 +88,7 @@ llvm::Value *FunctionDefinitionNode::codegen(std::unique_ptr<Context> &context)
     llvm::Type *resultType;
     if (m_isProcedure)
     {
-        resultType = llvm::Type::getVoidTy(*context->TheContext);
+        resultType = llvm::Type::getVoidTy(*context->context());
     }
     else
     {
@@ -105,9 +105,9 @@ llvm::Value *FunctionDefinitionNode::codegen(std::unique_ptr<Context> &context)
         linkage = llvm::Function::InternalLinkage;
     }
 
-    llvm::Function *functionDefinition = context->TheModule->getFunction(functionSignature());
+    llvm::Function *functionDefinition = context->module()->getFunction(functionSignature());
     if (!functionDefinition)
-        functionDefinition = llvm::Function::Create(FT, linkage, functionSignature(), context->TheModule.get());
+        functionDefinition = llvm::Function::Create(FT, linkage, functionSignature(), context->module().get());
 
     // Set names for all arguments.
     unsigned idx = 0;
@@ -116,7 +116,7 @@ llvm::Value *FunctionDefinitionNode::codegen(std::unique_ptr<Context> &context)
         const auto param = m_params[idx];
         if (!param.isReference && param.type->baseType == VariableBaseType::Struct)
         {
-            arg.addAttr(llvm::Attribute::getWithByValType(*context->TheContext, param.type->generateLlvmType(context)));
+            arg.addAttr(llvm::Attribute::getWithByValType(*context->context(), param.type->generateLlvmType(context)));
             arg.addAttr(llvm::Attribute::NoUndef);
         }
 
@@ -130,7 +130,7 @@ llvm::Value *FunctionDefinitionNode::codegen(std::unique_ptr<Context> &context)
         functionDefinition->addFnAttr(llvm::Attribute::MustProgress);
         if (!m_isProcedure && m_returnType->baseType == VariableBaseType::String)
             functionDefinition->addFnAttr(llvm::Attribute::NoFree);
-        llvm::AttrBuilder b(*context->TheContext);
+        llvm::AttrBuilder b(*context->context());
         b.addAttribute("frame-pointer", "all");
         functionDefinition->addFnAttrs(b);
     }
@@ -145,44 +145,31 @@ llvm::Value *FunctionDefinitionNode::codegen(std::unique_ptr<Context> &context)
     }
 
 
-    context->FunctionDefinitions[functionSignature()] = functionDefinition;
+    context->addFunctionDefinition(functionSignature(), functionDefinition);
     // Create a new basic block to start insertion into.
 
-    context->TopLevelFunction = functionDefinition;
+    context->setCurrentFunction(functionDefinition);
     if (m_body)
     {
-        context->expliciteReturn = false;
+        context->explicitReturn = false;
         m_body->setBlockName(m_name + "_block");
         m_body->codegen(context);
         if (m_isProcedure)
         {
-            context->Builder->CreateRetVoid();
+            context->builder()->CreateRetVoid();
 
-            if (verifyFunction(*functionDefinition, &llvm::errs()))
-            {
-                if (context->compilerOptions.buildMode == BuildMode::Release)
-                {
-                    context->TheFPM->run(*functionDefinition, *context->TheFAM);
-                }
-            }
-
+            context->verifyFunction(functionDefinition);
             return functionDefinition;
         }
-        if (!context->expliciteReturn)
+        if (!context->explicitReturn)
         {
-            context->Builder->CreateRet(context->Builder->CreateLoad(resultType, context->NamedAllocations[m_name]));
+            context->builder()->CreateRet(context->builder()->CreateLoad(resultType, context->namedAllocation(m_name)));
         }
 
         // Finish off the function.
 
         // Validate the generated code, checking for consistency.
-        if (!llvm::verifyFunction(*functionDefinition, &llvm::errs()))
-        {
-            if (context->compilerOptions.buildMode == BuildMode::Release)
-            {
-                context->TheFPM->run(*functionDefinition, *context->TheFAM);
-            }
-        }
+        context->verifyFunction(functionDefinition);
     }
 
 

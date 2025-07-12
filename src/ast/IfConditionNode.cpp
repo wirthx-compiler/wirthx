@@ -40,25 +40,25 @@ llvm::Value *IfConditionNode::codegenIf(std::unique_ptr<Context> &context)
     llvm::Value *CondV = m_conditionNode->codegen(context);
     if (!CondV)
         return nullptr;
-    CondV = context->Builder->CreateICmpEQ(CondV, context->Builder->getTrue(), "ifcond");
+    CondV = context->builder()->CreateICmpEQ(CondV, context->builder()->getTrue(), "ifcond");
 
-    llvm::Function *TheFunction = context->Builder->GetInsertBlock()->getParent();
-    llvm::BasicBlock *ThenBB = llvm::BasicBlock::Create(*context->TheContext, "then", TheFunction);
-    llvm::BasicBlock *MergeBB = llvm::BasicBlock::Create(*context->TheContext, "ifcont");
+    llvm::Function *TheFunction = context->builder()->GetInsertBlock()->getParent();
+    llvm::BasicBlock *ThenBB = llvm::BasicBlock::Create(*context->context(), "then", TheFunction);
+    llvm::BasicBlock *MergeBB = llvm::BasicBlock::Create(*context->context(), "ifcont");
 
-    context->Builder->CreateCondBr(CondV, ThenBB, MergeBB);
+    context->builder()->CreateCondBr(CondV, ThenBB, MergeBB);
 
-    context->Builder->SetInsertPoint(ThenBB);
+    context->builder()->SetInsertPoint(ThenBB);
 
     for (auto &exp: m_ifExpressions)
     {
         exp->codegen(context);
     }
-    if (!context->BreakBlock.BlockUsed)
-        context->Builder->CreateBr(MergeBB);
-    context->BreakBlock.BlockUsed = false;
+    if (!context->breakBlock().BlockUsed)
+        context->builder()->CreateBr(MergeBB);
+    context->breakBlock().BlockUsed = false;
     TheFunction->insert(TheFunction->end(), MergeBB);
-    context->Builder->SetInsertPoint(MergeBB);
+    context->builder()->SetInsertPoint(MergeBB);
 
     return CondV;
 }
@@ -70,46 +70,46 @@ llvm::Value *IfConditionNode::codegenIfElse(std::unique_ptr<Context> &context)
         return nullptr;
 
     // Convert condition to a bool by comparing non-equal to 0.0.
-    CondV = context->Builder->CreateICmpEQ(CondV, context->Builder->getInt1(1), "ifcond");
-    llvm::Function *TheFunction = context->Builder->GetInsertBlock()->getParent();
+    CondV = context->builder()->CreateICmpEQ(CondV, context->builder()->getInt1(1), "ifcond");
+    llvm::Function *TheFunction = context->builder()->GetInsertBlock()->getParent();
 
     // Create blocks for the then and else cases.  Insert the 'then' block at the
     // end of the function.
-    llvm::BasicBlock *ThenBB = llvm::BasicBlock::Create(*context->TheContext, "then", TheFunction);
-    llvm::BasicBlock *ElseBB = llvm::BasicBlock::Create(*context->TheContext, "else");
-    llvm::BasicBlock *MergeBB = llvm::BasicBlock::Create(*context->TheContext, "ifcont");
-    context->Builder->CreateCondBr(CondV, ThenBB, ElseBB);
+    llvm::BasicBlock *ThenBB = llvm::BasicBlock::Create(*context->context(), "then", TheFunction);
+    llvm::BasicBlock *ElseBB = llvm::BasicBlock::Create(*context->context(), "else");
+    llvm::BasicBlock *MergeBB = llvm::BasicBlock::Create(*context->context(), "ifcont");
+    context->builder()->CreateCondBr(CondV, ThenBB, ElseBB);
 
     // Emit then value.
-    context->Builder->SetInsertPoint(ThenBB);
+    context->builder()->SetInsertPoint(ThenBB);
 
     for (auto &exp: m_ifExpressions)
     {
         exp->codegen(context);
     }
-    if (!context->BreakBlock.BlockUsed)
-        context->Builder->CreateBr(MergeBB);
+    if (!context->breakBlock().BlockUsed)
+        context->builder()->CreateBr(MergeBB);
     // Codegen of 'Then' can change the current block, update ThenBB for the PHI.
-    ThenBB = context->Builder->GetInsertBlock();
+    ThenBB = context->builder()->GetInsertBlock();
 
     // Emit else block.
     TheFunction->insert(TheFunction->end(), ElseBB);
-    context->Builder->SetInsertPoint(ElseBB);
+    context->builder()->SetInsertPoint(ElseBB);
 
     for (auto &exp: m_elseExpressions)
     {
         exp->codegen(context);
     }
-    if (!context->BreakBlock.BlockUsed)
-        context->Builder->CreateBr(MergeBB);
+    if (!context->breakBlock().BlockUsed)
+        context->builder()->CreateBr(MergeBB);
     // Codegen of 'Else' can change the current block, update ElseBB for the PHI.
-    ElseBB = context->Builder->GetInsertBlock();
+    ElseBB = context->builder()->GetInsertBlock();
 
     // Emit merge block.
     TheFunction->insert(TheFunction->end(), MergeBB);
-    context->Builder->SetInsertPoint(MergeBB);
+    context->builder()->SetInsertPoint(MergeBB);
     // llvm::PHINode *PN =
-    //     context->Builder->CreatePHI(llvm::Type::getInt64Ty(*context->TheContext), 2, "iftmp");
+    //     context->builder()->CreatePHI(llvm::Type::getInt64Ty(*context->context()), 2, "iftmp");
 
     // PN->addIncoming(ThenV, ThenBB);
     // PN->addIncoming(ElseV, ElseBB);

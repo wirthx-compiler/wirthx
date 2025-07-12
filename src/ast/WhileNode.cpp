@@ -14,18 +14,18 @@ void WhileNode::print() {}
 
 llvm::Value *WhileNode::codegen(std::unique_ptr<Context> &context)
 {
-    llvm::BasicBlock *LoopBB = llvm::BasicBlock::Create(*context->TheContext, "loop", context->TopLevelFunction);
+    llvm::BasicBlock *LoopBB = llvm::BasicBlock::Create(*context->context(), "loop", context->currentFunction());
     llvm::BasicBlock *LoopCondBB =
-            llvm::BasicBlock::Create(*context->TheContext, "loop.cond", context->TopLevelFunction);
+            llvm::BasicBlock::Create(*context->context(), "loop.cond", context->currentFunction());
 
-    llvm::BasicBlock *AfterBB = llvm::BasicBlock::Create(*context->TheContext, "afterloop", context->TopLevelFunction);
+    llvm::BasicBlock *AfterBB = llvm::BasicBlock::Create(*context->context(), "afterloop", context->currentFunction());
 
     // Insert an explicit fall through from the current block to the LoopBB.
-    context->Builder->CreateBr(LoopCondBB);
-    context->Builder->SetInsertPoint(LoopCondBB);
+    context->builder()->CreateBr(LoopCondBB);
+    context->builder()->SetInsertPoint(LoopCondBB);
     // // Convert condition to a bool by comparing non-equal to 0.0.
-    // EndCond = context->Builder->CreateICmpEQ(
-    //     EndCond, llvm::ConstantInt::get(*context->TheContext, llvm::APInt(64, 0)), "loopcond");
+    // EndCond = context->builder()->CreateICmpEQ(
+    //     EndCond, llvm::ConstantInt::get(*context->context(), llvm::APInt(64, 0)), "loopcond");
     // Create the "after loop" block and insert it.
     // Compute the end condition.
     llvm::Value *EndCond = m_loopCondition->codegen(context);
@@ -34,33 +34,33 @@ llvm::Value *WhileNode::codegen(std::unique_ptr<Context> &context)
 
 
     // Insert the conditional branch into the end of LoopEndBB.
-    context->Builder->CreateCondBr(EndCond, LoopBB, AfterBB);
+    context->builder()->CreateCondBr(EndCond, LoopBB, AfterBB);
 
 
     // Start insertion in LoopBB.
-    context->Builder->SetInsertPoint(LoopBB);
+    context->builder()->SetInsertPoint(LoopBB);
 
     // Emit the body of the loop.  This, like any other expr, can change the
     // current BB.  Note that we ignore the value computed by the body, but don't
     // allow an error.
-    auto lastBreakBlock = context->BreakBlock.Block;
-    context->BreakBlock.Block = AfterBB;
-    context->BreakBlock.BlockUsed = false;
+    auto lastBreakBlock = context->breakBlock().Block;
+    context->breakBlock().Block = AfterBB;
+    context->breakBlock().BlockUsed = false;
 
     for (auto &node: m_nodes)
     {
-        context->Builder->SetInsertPoint(LoopBB);
+        context->builder()->SetInsertPoint(LoopBB);
         node->codegen(context);
     }
-    context->Builder->CreateBr(LoopCondBB);
+    context->builder()->CreateBr(LoopCondBB);
 
-    context->BreakBlock.Block = lastBreakBlock;
+    context->breakBlock().Block = lastBreakBlock;
 
     // Any new code will be inserted in AfterBB.
-    context->Builder->SetInsertPoint(AfterBB);
+    context->builder()->SetInsertPoint(AfterBB);
 
     // for expr always returns 0.0.
-    return llvm::Constant::getNullValue(llvm::Type::getInt64Ty(*context->TheContext));
+    return llvm::Constant::getNullValue(llvm::Type::getInt64Ty(*context->context()));
 }
 void WhileNode::typeCheck(const std::unique_ptr<UnitNode> &unit, ASTNode *parentNode)
 {

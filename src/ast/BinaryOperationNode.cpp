@@ -26,29 +26,29 @@ llvm::Value *BinaryOperationNode::generateForInteger(llvm::Value *lhs, llvm::Val
                                                      std::unique_ptr<Context> &context)
 {
     const unsigned maxBitWith = std::max(lhs->getType()->getIntegerBitWidth(), rhs->getType()->getIntegerBitWidth());
-    const auto targetType = llvm::IntegerType::get(*context->TheContext, maxBitWith);
+    const auto targetType = llvm::IntegerType::get(*context->context(), maxBitWith);
     if (maxBitWith != lhs->getType()->getIntegerBitWidth())
     {
-        lhs = context->Builder->CreateIntCast(lhs, targetType, true, "lhs_cast");
+        lhs = context->builder()->CreateIntCast(lhs, targetType, true, "lhs_cast");
     }
     if (maxBitWith != rhs->getType()->getIntegerBitWidth())
     {
-        rhs = context->Builder->CreateIntCast(rhs, targetType, true, "rhs_cast");
+        rhs = context->builder()->CreateIntCast(rhs, targetType, true, "rhs_cast");
     }
 
 
     switch (m_operator)
     {
         case Operator::PLUS:
-            return context->Builder->CreateAdd(lhs, rhs, "addtmp");
+            return context->builder()->CreateAdd(lhs, rhs, "addtmp");
         case Operator::MINUS:
-            return context->Builder->CreateSub(lhs, rhs, "subtmp");
+            return context->builder()->CreateSub(lhs, rhs, "subtmp");
         case Operator::MUL:
-            return context->Builder->CreateMul(lhs, rhs, "multmp");
+            return context->builder()->CreateMul(lhs, rhs, "multmp");
         case Operator::MOD:
-            return context->Builder->CreateSRem(lhs, rhs, "srem");
+            return context->builder()->CreateSRem(lhs, rhs, "srem");
         case Operator::IDIV:
-            return context->Builder->CreateSDiv(lhs, rhs, "sdiv");
+            return context->builder()->CreateSDiv(lhs, rhs, "sdiv");
         default:
             throw CompilerException(ParserError{.token = ASTNode::expressionToken(),
                                                 .message = "the operation " +
@@ -62,26 +62,26 @@ llvm::Value *BinaryOperationNode::generateForFloat(llvm::Value *lhs, llvm::Value
 {
     if (lhs->getType()->isFloatTy() && rhs->getType()->isDoubleTy())
     {
-        lhs = context->Builder->CreateFPCast(lhs, rhs->getType());
+        lhs = context->builder()->CreateFPCast(lhs, rhs->getType());
     }
     else if (lhs->getType()->isDoubleTy() && rhs->getType()->isFloatTy())
     {
-        lhs = context->Builder->CreateFPCast(rhs, lhs->getType());
+        lhs = context->builder()->CreateFPCast(rhs, lhs->getType());
     }
 
 
     switch (m_operator)
     {
         case Operator::PLUS:
-            return context->Builder->CreateFAdd(lhs, rhs, "addtmp");
+            return context->builder()->CreateFAdd(lhs, rhs, "addtmp");
         case Operator::MINUS:
-            return context->Builder->CreateFSub(lhs, rhs, "subtmp");
+            return context->builder()->CreateFSub(lhs, rhs, "subtmp");
         case Operator::MUL:
-            return context->Builder->CreateFMul(lhs, rhs, "multmp");
+            return context->builder()->CreateFMul(lhs, rhs, "multmp");
         case Operator::MOD:
-            return context->Builder->CreateFRem(lhs, rhs, "srem");
+            return context->builder()->CreateFRem(lhs, rhs, "srem");
         case Operator::DIV:
-            return context->Builder->CreateFDiv(lhs, rhs, "sdiv");
+            return context->builder()->CreateFDiv(lhs, rhs, "sdiv");
         default:
             throw CompilerException(ParserError{.token = ASTNode::expressionToken(),
                                                 .message = "the operation " +
@@ -98,75 +98,75 @@ llvm::Value *BinaryOperationNode::generateForStringPlusChar(llvm::Value *lhs, ll
     const auto valueType = VariableType::getInteger(8)->generateLlvmType(context);
     const auto llvmRecordType = varType->generateLlvmType(context);
     const auto indexType = VariableType::getInteger(64)->generateLlvmType(context);
-    const auto stringAlloc = context->Builder->CreateAlloca(llvmRecordType, nullptr, "combined_string");
+    const auto stringAlloc = context->builder()->CreateAlloca(llvmRecordType, nullptr, "combined_string");
 
 
     const auto arrayRefCountOffset =
-            context->Builder->CreateStructGEP(llvmRecordType, stringAlloc, 0, "combined_string.refCount.offset");
+            context->builder()->CreateStructGEP(llvmRecordType, stringAlloc, 0, "combined_string.refCount.offset");
     const auto arraySizeOffset =
-            context->Builder->CreateStructGEP(llvmRecordType, stringAlloc, 1, "combined_string.size.offset");
+            context->builder()->CreateStructGEP(llvmRecordType, stringAlloc, 1, "combined_string.size.offset");
 
 
     const auto arrayPointerOffset =
-            context->Builder->CreateStructGEP(llvmRecordType, stringAlloc, 2, "combined_string.ptr.offset");
+            context->builder()->CreateStructGEP(llvmRecordType, stringAlloc, 2, "combined_string.ptr.offset");
 
-    const auto lhsIndexPtr = context->Builder->CreateStructGEP(llvmRecordType, lhs, 1, "lhs.size.offset");
+    const auto lhsIndexPtr = context->builder()->CreateStructGEP(llvmRecordType, lhs, 1, "lhs.size.offset");
 
 
     // lhs size
-    const auto lhsIndex = context->Builder->CreateLoad(indexType, lhsIndexPtr, "lhs.size");
+    const auto lhsIndex = context->builder()->CreateLoad(indexType, lhsIndexPtr, "lhs.size");
 
     llvm::Value *rhsSize = nullptr;
     if (rhs->getType()->getIntegerBitWidth() == 8)
     {
-        rhsSize = context->Builder->getInt64(1);
+        rhsSize = context->builder()->getInt64(1);
     }
 
-    const auto newSize = context->Builder->CreateAdd(lhsIndex, rhsSize, "new_size");
+    const auto newSize = context->builder()->CreateAdd(lhsIndex, rhsSize, "new_size");
 
 
     // change array size
-    context->Builder->CreateStore(context->Builder->getInt64(1), arrayRefCountOffset);
-    context->Builder->CreateStore(newSize, arraySizeOffset);
+    context->builder()->CreateStore(context->builder()->getInt64(1), arrayRefCountOffset);
+    context->builder()->CreateStore(newSize, arraySizeOffset);
 
-    const auto allocCall = context->Builder->CreateMalloc(
-            indexType, context->Builder->getPtrTy(),
-            context->Builder->CreateAdd(newSize, context->Builder->getInt64(1)), newSize);
+    const auto allocCall = context->builder()->CreateMalloc(
+            indexType, context->builder()->getPtrTy(),
+            context->builder()->CreateAdd(newSize, context->builder()->getInt64(1)), newSize);
 
     {
         const auto memcpyCall = llvm::Intrinsic::getDeclaration(
-                context->TheModule.get(), llvm::Intrinsic::memcpy,
-                {context->Builder->getPtrTy(), context->Builder->getPtrTy(), context->Builder->getInt64Ty()});
-        const auto boundsLhs = context->Builder->CreateGEP(
-                valueType, allocCall, llvm::ArrayRef<llvm::Value *>{context->Builder->getInt64(0)}, "", false);
-        const auto lhsPtrOffset = context->Builder->CreateStructGEP(llvmRecordType, lhs, 2, "lhs.ptr.offset");
+                context->module().get(), llvm::Intrinsic::memcpy,
+                {context->builder()->getPtrTy(), context->builder()->getPtrTy(), context->builder()->getInt64Ty()});
+        const auto boundsLhs = context->builder()->CreateGEP(
+                valueType, allocCall, llvm::ArrayRef<llvm::Value *>{context->builder()->getInt64(0)}, "", false);
+        const auto lhsPtrOffset = context->builder()->CreateStructGEP(llvmRecordType, lhs, 2, "lhs.ptr.offset");
         const auto loadResult =
-                context->Builder->CreateLoad(llvm::PointerType::getUnqual(*context->TheContext), lhsPtrOffset);
+                context->builder()->CreateLoad(llvm::PointerType::getUnqual(*context->context()), lhsPtrOffset);
         std::vector<llvm::Value *> memcopyArgs;
-        memcopyArgs.push_back(context->Builder->CreateBitCast(boundsLhs, context->Builder->getPtrTy()));
-        memcopyArgs.push_back(context->Builder->CreateBitCast(loadResult, context->Builder->getPtrTy()));
+        memcopyArgs.push_back(context->builder()->CreateBitCast(boundsLhs, context->builder()->getPtrTy()));
+        memcopyArgs.push_back(context->builder()->CreateBitCast(loadResult, context->builder()->getPtrTy()));
         memcopyArgs.push_back(lhsIndex);
-        memcopyArgs.push_back(context->Builder->getFalse());
+        memcopyArgs.push_back(context->builder()->getFalse());
 
-        context->Builder->CreateCall(memcpyCall, memcopyArgs);
+        context->builder()->CreateCall(memcpyCall, memcopyArgs);
     }
-    context->Builder->CreateStore(allocCall, arrayPointerOffset);
+    context->builder()->CreateStore(allocCall, arrayPointerOffset);
 
     {
 
         const auto bounds =
-                context->Builder->CreateGEP(valueType, allocCall, llvm::ArrayRef<llvm::Value *>{lhsIndex}, "", false);
+                context->builder()->CreateGEP(valueType, allocCall, llvm::ArrayRef<llvm::Value *>{lhsIndex}, "", false);
 
-        context->Builder->CreateStore(rhs, bounds);
+        context->builder()->CreateStore(rhs, bounds);
     }
     {
 
-        const auto bounds = context->Builder->CreateGEP(
+        const auto bounds = context->builder()->CreateGEP(
                 valueType, allocCall,
-                llvm::ArrayRef<llvm::Value *>{context->Builder->CreateAdd(lhsIndex, context->Builder->getInt64(1))}, "",
-                false);
+                llvm::ArrayRef<llvm::Value *>{context->builder()->CreateAdd(lhsIndex, context->builder()->getInt64(1))},
+                "", false);
 
-        context->Builder->CreateStore(context->Builder->getInt8(0), bounds);
+        context->builder()->CreateStore(context->builder()->getInt8(0), bounds);
     }
     return stringAlloc;
 }
@@ -179,72 +179,73 @@ llvm::Value *BinaryOperationNode::generateForString(llvm::Value *lhs, llvm::Valu
     const auto valueType = VariableType::getInteger(8)->generateLlvmType(context);
     const auto llvmRecordType = varType->generateLlvmType(context);
     const auto indexType = VariableType::getInteger(64)->generateLlvmType(context);
-    const auto stringAlloc = context->Builder->CreateAlloca(llvmRecordType, nullptr, "combined_string");
+    const auto stringAlloc = context->builder()->CreateAlloca(llvmRecordType, nullptr, "combined_string");
 
 
     const auto arrayRefCountOffset =
-            context->Builder->CreateStructGEP(llvmRecordType, stringAlloc, 0, "combined_string.refCount.offset");
+            context->builder()->CreateStructGEP(llvmRecordType, stringAlloc, 0, "combined_string.refCount.offset");
     const auto arraySizeOffset =
-            context->Builder->CreateStructGEP(llvmRecordType, stringAlloc, 1, "combined_string.size.offset");
+            context->builder()->CreateStructGEP(llvmRecordType, stringAlloc, 1, "combined_string.size.offset");
 
 
     const auto arrayPointerOffset =
-            context->Builder->CreateStructGEP(llvmRecordType, stringAlloc, 2, "combined_string.ptr.offset");
+            context->builder()->CreateStructGEP(llvmRecordType, stringAlloc, 2, "combined_string.ptr.offset");
 
-    const auto lhsIndexPtr = context->Builder->CreateStructGEP(llvmRecordType, lhs, 1, "lhs.size.offset");
+    const auto lhsIndexPtr = context->builder()->CreateStructGEP(llvmRecordType, lhs, 1, "lhs.size.offset");
 
-    const auto rhsIndexPtr = context->Builder->CreateStructGEP(llvmRecordType, rhs, 1, "rhs.size.offset");
+    const auto rhsIndexPtr = context->builder()->CreateStructGEP(llvmRecordType, rhs, 1, "rhs.size.offset");
     // lhs size
-    const auto lhsIndex = context->Builder->CreateLoad(indexType, lhsIndexPtr, "lhs.size");
-    const auto rhsIndex = context->Builder->CreateLoad(indexType, rhsIndexPtr, "rhs.size");
+    const auto lhsIndex = context->builder()->CreateLoad(indexType, lhsIndexPtr, "lhs.size");
+    const auto rhsIndex = context->builder()->CreateLoad(indexType, rhsIndexPtr, "rhs.size");
 
-    const auto newSize = context->Builder->CreateAdd(
-            lhsIndex, context->Builder->CreateAdd(rhsIndex, context->Builder->getInt64(-1)), "new_size");
+    const auto newSize = context->builder()->CreateAdd(
+            lhsIndex, context->builder()->CreateAdd(rhsIndex, context->builder()->getInt64(-1)), "new_size");
     ;
 
 
     // change array size
-    context->Builder->CreateStore(context->Builder->getInt64(1), arrayRefCountOffset);
-    context->Builder->CreateStore(newSize, arraySizeOffset);
+    context->builder()->CreateStore(context->builder()->getInt64(1), arrayRefCountOffset);
+    context->builder()->CreateStore(newSize, arraySizeOffset);
 
-    const auto allocCall = context->Builder->CreateMalloc(indexType, context->Builder->getPtrTy(), newSize, nullptr);
+    const auto allocCall =
+            context->builder()->CreateMalloc(indexType, context->builder()->getPtrTy(), newSize, nullptr);
 
 
     const auto memcpyCall = llvm::Intrinsic::getDeclaration(
-            context->TheModule.get(), llvm::Intrinsic::memcpy,
-            {context->Builder->getPtrTy(), context->Builder->getPtrTy(), context->Builder->getInt64Ty()});
+            context->module().get(), llvm::Intrinsic::memcpy,
+            {context->builder()->getPtrTy(), context->builder()->getPtrTy(), context->builder()->getInt64Ty()});
     {
-        const auto boundsLhs = context->Builder->CreateGEP(
-                valueType, allocCall, llvm::ArrayRef<llvm::Value *>{context->Builder->getInt64(0)}, "", false);
-        const auto lhsPtrOffset = context->Builder->CreateStructGEP(llvmRecordType, lhs, 2, "lhs.ptr.offset");
+        const auto boundsLhs = context->builder()->CreateGEP(
+                valueType, allocCall, llvm::ArrayRef<llvm::Value *>{context->builder()->getInt64(0)}, "", false);
+        const auto lhsPtrOffset = context->builder()->CreateStructGEP(llvmRecordType, lhs, 2, "lhs.ptr.offset");
         const auto loadResult =
-                context->Builder->CreateLoad(llvm::PointerType::getUnqual(*context->TheContext), lhsPtrOffset);
+                context->builder()->CreateLoad(llvm::PointerType::getUnqual(*context->context()), lhsPtrOffset);
         std::vector<llvm::Value *> memcopyArgs;
-        memcopyArgs.push_back(context->Builder->CreateBitCast(boundsLhs, context->Builder->getPtrTy()));
-        memcopyArgs.push_back(context->Builder->CreateBitCast(loadResult, context->Builder->getPtrTy()));
+        memcopyArgs.push_back(context->builder()->CreateBitCast(boundsLhs, context->builder()->getPtrTy()));
+        memcopyArgs.push_back(context->builder()->CreateBitCast(loadResult, context->builder()->getPtrTy()));
         memcopyArgs.push_back(lhsIndex);
-        memcopyArgs.push_back(context->Builder->getFalse());
+        memcopyArgs.push_back(context->builder()->getFalse());
 
-        context->Builder->CreateCall(memcpyCall, memcopyArgs);
+        context->builder()->CreateCall(memcpyCall, memcopyArgs);
     }
-    context->Builder->CreateStore(allocCall, arrayPointerOffset);
+    context->builder()->CreateStore(allocCall, arrayPointerOffset);
 
     {
-        const auto rhsPtrOffset = context->Builder->CreateStructGEP(llvmRecordType, rhs, 2, "rhs.ptr.offset");
+        const auto rhsPtrOffset = context->builder()->CreateStructGEP(llvmRecordType, rhs, 2, "rhs.ptr.offset");
         const auto loadResult =
-                context->Builder->CreateLoad(llvm::PointerType::getUnqual(*context->TheContext), rhsPtrOffset);
-        const auto bounds = context->Builder->CreateGEP(
-                valueType, allocCall,
-                llvm::ArrayRef<llvm::Value *>{context->Builder->CreateAdd(lhsIndex, context->Builder->getInt64(-1))},
-                "", false);
+                context->builder()->CreateLoad(llvm::PointerType::getUnqual(*context->context()), rhsPtrOffset);
+        const auto bounds = context->builder()->CreateGEP(valueType, allocCall,
+                                                          llvm::ArrayRef<llvm::Value *>{context->builder()->CreateAdd(
+                                                                  lhsIndex, context->builder()->getInt64(-1))},
+                                                          "", false);
 
         std::vector<llvm::Value *> memcopyArgs;
-        memcopyArgs.push_back(context->Builder->CreateBitCast(bounds, context->Builder->getPtrTy()));
-        memcopyArgs.push_back(context->Builder->CreateBitCast(loadResult, context->Builder->getPtrTy()));
+        memcopyArgs.push_back(context->builder()->CreateBitCast(bounds, context->builder()->getPtrTy()));
+        memcopyArgs.push_back(context->builder()->CreateBitCast(loadResult, context->builder()->getPtrTy()));
         memcopyArgs.push_back(rhsIndex);
-        memcopyArgs.push_back(context->Builder->getFalse());
+        memcopyArgs.push_back(context->builder()->getFalse());
 
-        context->Builder->CreateCall(memcpyCall, memcopyArgs);
+        context->builder()->CreateCall(memcpyCall, memcopyArgs);
     }
 
     return stringAlloc;
@@ -265,8 +266,8 @@ llvm::Value *BinaryOperationNode::codegen(std::unique_ptr<Context> &context)
         return generateForInteger(lhs, rhs, context);
     }
 
-    const auto lhs_type = m_lhs->resolveType(context->ProgramUnit, parent);
-    const auto rhs_type = m_rhs->resolveType(context->ProgramUnit, parent);
+    const auto lhs_type = m_lhs->resolveType(context->programUnit(), parent);
+    const auto rhs_type = m_rhs->resolveType(context->programUnit(), parent);
 
 
     switch (lhs_type->baseType)
