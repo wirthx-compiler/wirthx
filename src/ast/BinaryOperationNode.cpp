@@ -94,7 +94,7 @@ llvm::Value *BinaryOperationNode::generateForFloat(llvm::Value *lhs, llvm::Value
 llvm::Value *BinaryOperationNode::generateForStringPlusChar(llvm::Value *lhs, llvm::Value *rhs,
                                                             std::unique_ptr<Context> &context)
 {
-    const auto varType = StringType::getString();
+    const auto varType = context->programUnit()->getTypeDefinitions().getType("string");
     const auto valueType = VariableType::getInteger(8)->generateLlvmType(context);
     const auto llvmRecordType = varType->generateLlvmType(context);
     const auto indexType = VariableType::getInteger(64)->generateLlvmType(context);
@@ -175,7 +175,7 @@ llvm::Value *BinaryOperationNode::generateForString(llvm::Value *lhs, llvm::Valu
                                                     std::unique_ptr<Context> &context)
 {
 
-    const auto varType = StringType::getString();
+    const auto varType = context->programUnit()->getTypeDefinitions().getType("string");
     const auto valueType = VariableType::getInteger(8)->generateLlvmType(context);
     const auto llvmRecordType = varType->generateLlvmType(context);
     const auto indexType = VariableType::getInteger(64)->generateLlvmType(context);

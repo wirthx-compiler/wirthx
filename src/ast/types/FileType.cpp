@@ -1,7 +1,11 @@
 #include "FileType.h"
 
 #include <llvm/IR/DerivedTypes.h>
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Module.h>
 #include <vector>
+
+#include "compiler/Context.h"
 
 FileType::FileType(const std::string &typeName, std::optional<std::shared_ptr<VariableType>> childType) :
     VariableType(VariableBaseType::File, typeName), m_childType(std::move(childType))
@@ -9,7 +13,9 @@ FileType::FileType(const std::string &typeName, std::optional<std::shared_ptr<Va
 }
 llvm::Type *FileType::generateLlvmType(std::unique_ptr<Context> &context)
 {
-    if (m_cachedType == nullptr)
+
+    auto cache = llvm::StructType::getTypeByName(*context->context(), typeName);
+    if (cache == nullptr)
     {
         std::vector<llvm::Type *> types;
         types.emplace_back(::PointerType::getPointerTo(VariableType::getInteger(8))->generateLlvmType(context));
@@ -19,12 +25,11 @@ llvm::Type *FileType::generateLlvmType(std::unique_ptr<Context> &context)
         const llvm::ArrayRef<llvm::Type *> elements(types);
 
 
-        m_cachedType = llvm::StructType::create(elements, typeName);
+        return llvm::StructType::create(*context->context(), elements, typeName);
     }
-    return m_cachedType;
+    return cache;
 }
 std::shared_ptr<VariableType> FileType::getFileType(std::optional<std::shared_ptr<VariableType>> childType)
 {
-    static auto type = std::make_shared<FileType>("file", childType);
-    return type;
+    return std::make_shared<FileType>("file", childType);
 }

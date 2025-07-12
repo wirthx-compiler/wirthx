@@ -14,19 +14,17 @@
 
 UnitNode::UnitNode(const Token &token, const UnitType unitType, const std::string &unitName,
                    const std::vector<std::shared_ptr<FunctionDefinitionNode>> &functionDefinitions,
-                   const std::unordered_map<std::string, std::shared_ptr<VariableType>> &typeDefinitions,
-                   const std::shared_ptr<BlockNode> &blockNode) :
+                   const TypeRegistry &typeDefinitions, const std::shared_ptr<BlockNode> &blockNode) :
     ASTNode(token), m_unitType(unitType), m_unitName(unitName), m_functionDefinitions(functionDefinitions),
-    m_typeDefinitions(typeDefinitions), m_blockNode(blockNode)
+    m_typeDefinitions(std::move(typeDefinitions)), m_blockNode(blockNode)
 {
 }
-UnitNode::UnitNode(const Token &token, UnitType unitType, const std::string &unitName,
+UnitNode::UnitNode(const Token &token, const UnitType unitType, const std::string &unitName,
                    const std::vector<std::string> &argumentNames,
                    const std::vector<std::shared_ptr<FunctionDefinitionNode>> &functionDefinitions,
-                   const std::unordered_map<std::string, std::shared_ptr<VariableType>> &typeDefinitions,
-                   const std::shared_ptr<BlockNode> &blockNode) :
+                   const TypeRegistry &typeDefinitions, const std::shared_ptr<BlockNode> &blockNode) :
     ASTNode(token), m_unitType(unitType), m_unitName(unitName), m_functionDefinitions(functionDefinitions),
-    m_typeDefinitions(typeDefinitions), m_blockNode(blockNode), m_argumentNames(argumentNames)
+    m_typeDefinitions(std::move(typeDefinitions)), m_blockNode(blockNode), m_argumentNames(argumentNames)
 {
 }
 
@@ -120,7 +118,7 @@ llvm::Value *UnitNode::codegen(std::unique_ptr<Context> &context)
         else
         {
             auto cFile = llvm::PointerType::getUnqual(*context->context());
-            auto fileType = FileType::getFileType();
+            auto fileType = context->programUnit()->getTypeDefinitions().getType("file");
             auto ext_stderr = new llvm::GlobalVariable(*context->module(), cFile, false,
                                                        llvm::GlobalValue::ExternalLinkage, nullptr, "stderr");
             // ext_stderr->setExternallyInitialized(true);
@@ -199,7 +197,7 @@ llvm::Value *UnitNode::codegen(std::unique_ptr<Context> &context)
 
         if (m_argumentNames.size() >= 2)
         {
-            auto fileType = FileType::getFileType();
+            auto fileType = context->programUnit()->getTypeDefinitions().getType("file");
 
 
             m_blockNode->addVariableDefinition(VariableDefinition{.variableType = fileType,
@@ -208,7 +206,7 @@ llvm::Value *UnitNode::codegen(std::unique_ptr<Context> &context)
                                                                   .llvmValue = context->namedValue("stdout"),
                                                                   .constant = false});
         }
-        auto fileType = FileType::getFileType();
+        auto fileType = context->programUnit()->getTypeDefinitions().getType("file");
 
         if (m_argumentNames.size() >= 1)
         {
@@ -266,10 +264,7 @@ std::set<std::string> UnitNode::collectLibsToLink()
     }
     return result;
 }
-std::unordered_map<std::string, std::shared_ptr<VariableType>> UnitNode::getTypeDefinitions()
-{
-    return m_typeDefinitions;
-}
+TypeRegistry UnitNode::getTypeDefinitions() { return m_typeDefinitions; }
 void UnitNode::typeCheck(const std::unique_ptr<UnitNode> &unit, ASTNode *parentNode)
 {
     for (const auto &def: m_functionDefinitions)

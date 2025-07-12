@@ -2,6 +2,7 @@
 #include <iostream>
 #include <llvm/IR/IRBuilder.h>
 
+#include "UnitNode.h"
 #include "compiler/Context.h"
 #include "types/StringType.h"
 
@@ -61,7 +62,7 @@ llvm::Value *StringConstantNode::codegen(std::unique_ptr<Context> &context)
     llvm::GlobalVariable *const constant = generateConstant(context, result);
     if (context->currentFunction())
     {
-        const auto varType = StringType::getString();
+        const auto varType = context->programUnit()->getTypeDefinitions().getType("string");
         const auto llvmRecordType = varType->generateLlvmType(context);
         const auto stringAlloc = context->builder()->CreateAlloca(llvmRecordType, nullptr, "string_constant");
 

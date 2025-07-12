@@ -15,5 +15,7 @@ bool pascal_link_modules(std::ostream &errStream, const std::filesystem::path &b
     for (auto &flag: flags)
         args.emplace_back(flag);
 
+    args.emplace_back("-fuse-ld=gold");
+
     return execute_command_list(errStream, errStream, "cc", args);
 }

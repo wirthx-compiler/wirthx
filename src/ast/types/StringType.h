@@ -6,8 +6,6 @@
 class StringType : public VariableType, public FieldAccessableType, public RangeType
 {
 private:
-    llvm::Type *llvmType = nullptr;
-
 public:
     llvm::Type *generateLlvmType(std::unique_ptr<Context> &context) override;
     llvm::Value *generateFieldAccess(Token &token, llvm::Value *indexValue, std::unique_ptr<Context> &context) override;

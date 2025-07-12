@@ -8,10 +8,9 @@
 
 llvm::Type *StringType::generateLlvmType(std::unique_ptr<Context> &context)
 {
-    if (llvmType != nullptr && llvmType->getContext().pImpl != context->context()->pImpl)
-    {
-        llvmType = nullptr;
-    }
+
+    const auto llvmType = llvm::StructType::getTypeByName(*context->context(), "string");
+
 
     if (llvmType == nullptr)
     {
@@ -26,7 +25,7 @@ llvm::Type *StringType::generateLlvmType(std::unique_ptr<Context> &context)
         llvm::ArrayRef<llvm::Type *> Elements(types);
 
 
-        llvmType = llvm::StructType::create(Elements, "string");
+        return llvm::StructType::create(*context->context(), Elements, "string");
     }
     return llvmType;
 }

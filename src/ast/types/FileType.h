@@ -7,7 +7,6 @@ class FileType : public VariableType
 {
 private:
     std::optional<std::shared_ptr<VariableType>> m_childType;
-    llvm::Type *m_cachedType = nullptr;
 
 public:
     explicit FileType(const std::string &typeName,

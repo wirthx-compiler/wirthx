@@ -42,7 +42,8 @@ int RecordType::getFieldIndexByName(const std::string &name) const
 
 llvm::Type *RecordType::generateLlvmType(std::unique_ptr<Context> &context)
 {
-    if (m_cachedType == nullptr)
+    auto cached_type = llvm::StructType::getTypeByName(*context->context(), typeName);
+    if (cached_type == nullptr)
     {
         std::vector<llvm::Type *> types;
         for (size_t i = 0; i < size(); ++i)
@@ -53,9 +54,9 @@ llvm::Type *RecordType::generateLlvmType(std::unique_ptr<Context> &context)
         llvm::ArrayRef<llvm::Type *> Elements(types);
 
 
-        m_cachedType = llvm::StructType::create(Elements, typeName);
+        return llvm::StructType::create(*context->context(), Elements, typeName);
     }
-    return m_cachedType;
+    return cached_type;
 }
 
 size_t RecordType::size() const { return m_fields.size(); }

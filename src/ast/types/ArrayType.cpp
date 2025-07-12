@@ -13,11 +13,13 @@ std::shared_ptr<ArrayType> ArrayType::getFixedArray(size_t low, size_t heigh,
                                                     const std::shared_ptr<VariableType> &baseType)
 {
     auto type = std::make_shared<ArrayType>();
+    type->typeName = "array_" + baseType->typeName + "_" + std::to_string(low) + "_" + std::to_string(heigh);
     type->baseType = VariableBaseType::Array;
     type->low = low;
     type->high = heigh;
     type->arrayBase = baseType;
     type->isDynArray = false;
+    type->llvmType = nullptr;
     return type;
 }
 
@@ -25,10 +27,12 @@ std::shared_ptr<ArrayType> ArrayType::getDynArray(const std::shared_ptr<Variable
 {
     auto type = std::make_shared<ArrayType>();
     type->baseType = VariableBaseType::Array;
+    type->typeName = "dynarray_" + baseType->typeName;
     type->low = 0;
     type->high = 0;
     type->arrayBase = baseType;
     type->isDynArray = true;
+    type->llvmType = nullptr;
     return type;
 }
 
@@ -56,14 +60,14 @@ llvm::Type *ArrayType::generateLlvmType(std::unique_ptr<Context> &context)
             llvm::ArrayRef<llvm::Type *> Elements(types);
 
 
-            llvmType = llvm::StructType::create(Elements);
+            llvmType = llvm::StructType::create(*context->context(), Elements, arrayBase->typeName);
         }
         else
         {
 
             const auto arraySize = high - low + 1;
 
-            llvmType = llvm::ArrayType::get(arrayBaseType, arraySize);
+            return llvm::ArrayType::get(arrayBaseType, arraySize);
         }
     }
     return llvmType;
