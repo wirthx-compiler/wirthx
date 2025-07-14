@@ -262,20 +262,20 @@ llvm::Value *SystemFunctionCallNode::codegen_write(std::unique_ptr<Context> &con
             if (context->TargetTriple->getOS() == llvm::Triple::Win32)
             {
                 if (integerType->length > 32)
-                    ArgsV.push_back(context->builder()->CreateGlobalString("%lli", "format_int64"));
+                    ArgsV.push_back(context->getOrCreateGlobalString("%lli", "format_int64"));
                 else if (integerType->length == 8)
-                    ArgsV.push_back(context->builder()->CreateGlobalString("%c", "format_char"));
+                    ArgsV.push_back(context->getOrCreateGlobalString("%c", "format_char"));
                 else
-                    ArgsV.push_back(context->builder()->CreateGlobalString("%i", "format_int"));
+                    ArgsV.push_back(context->getOrCreateGlobalString("%i", "format_int"));
             }
             else
             {
                 if (integerType->length > 32)
-                    ArgsV.push_back(context->builder()->CreateGlobalString("%ld", "format_int64"));
+                    ArgsV.push_back(context->getOrCreateGlobalString("%ld", "format_int64"));
                 else if (integerType->length == 8)
-                    ArgsV.push_back(context->builder()->CreateGlobalString("%c", "format_char"));
+                    ArgsV.push_back(context->getOrCreateGlobalString("%c", "format_char"));
                 else
-                    ArgsV.push_back(context->builder()->CreateGlobalString("%d", "format_int"));
+                    ArgsV.push_back(context->getOrCreateGlobalString("%d", "format_int"));
             }
 
             ArgsV.push_back(argValue);
@@ -283,7 +283,7 @@ llvm::Value *SystemFunctionCallNode::codegen_write(std::unique_ptr<Context> &con
         else if (auto stringType = std::dynamic_pointer_cast<StringType>(type))
         {
 
-            ArgsV.push_back(context->builder()->CreateGlobalString("%s", "format_string"));
+            ArgsV.push_back(context->getOrCreateGlobalString("%s", "format_string"));
 
             const auto stringStructPtr = argValue;
             const auto stringLlvmType = type->generateLlvmType(context);
@@ -298,7 +298,7 @@ llvm::Value *SystemFunctionCallNode::codegen_write(std::unique_ptr<Context> &con
         }
         else if (type->baseType == VariableBaseType::Double || type->baseType == VariableBaseType::Float)
         {
-            ArgsV.push_back(context->builder()->CreateGlobalString("%f", "format_double"));
+            ArgsV.push_back(context->getOrCreateGlobalString("%f", "format_double"));
 
 
             ArgsV.push_back(context->builder()->CreateFPCast(argValue, context->builder()->getDoubleTy()));
@@ -312,20 +312,20 @@ llvm::Value *SystemFunctionCallNode::codegen_write(std::unique_ptr<Context> &con
             if (context->TargetTriple->getOS() == llvm::Triple::Win32)
             {
                 if (rangeType->length() > 32)
-                    ArgsV.push_back(context->builder()->CreateGlobalString("%lli", "format_int64"));
+                    ArgsV.push_back(context->getOrCreateGlobalString("%lli", "format_int64"));
                 else if (rangeType->length() == 8)
-                    ArgsV.push_back(context->builder()->CreateGlobalString("%c", "format_char"));
+                    ArgsV.push_back(context->getOrCreateGlobalString("%c", "format_char"));
                 else
-                    ArgsV.push_back(context->builder()->CreateGlobalString("%i", "format_int"));
+                    ArgsV.push_back(context->getOrCreateGlobalString("%i", "format_int"));
             }
             else
             {
                 if (rangeType->length() > 32)
-                    ArgsV.push_back(context->builder()->CreateGlobalString("%ld", "format_int64"));
+                    ArgsV.push_back(context->getOrCreateGlobalString("%ld", "format_int64"));
                 else if (rangeType->length() == 8)
-                    ArgsV.push_back(context->builder()->CreateGlobalString("%c", "format_char"));
+                    ArgsV.push_back(context->getOrCreateGlobalString("%c", "format_char"));
                 else
-                    ArgsV.push_back(context->builder()->CreateGlobalString("%d", "format_int"));
+                    ArgsV.push_back(context->getOrCreateGlobalString("%d", "format_int"));
             }
 
             ArgsV.push_back(argValue);
@@ -334,7 +334,7 @@ llvm::Value *SystemFunctionCallNode::codegen_write(std::unique_ptr<Context> &con
         {
             if (*(ptrType->pointerBase) == *(VariableType::getCharacter()))
             {
-                ArgsV.push_back(context->builder()->CreateGlobalString("%s", "format_string"));
+                ArgsV.push_back(context->getOrCreateGlobalString("%s", "format_string"));
                 ArgsV.push_back(argValue);
             }
             else
@@ -344,7 +344,7 @@ llvm::Value *SystemFunctionCallNode::codegen_write(std::unique_ptr<Context> &con
         }
         else if (type->baseType == VariableBaseType::Character)
         {
-            ArgsV.push_back(context->builder()->CreateGlobalString("%c", "format_char"));
+            ArgsV.push_back(context->getOrCreateGlobalString("%c", "format_char"));
             ArgsV.push_back(argValue);
         }
         else
@@ -371,11 +371,11 @@ llvm::Value *SystemFunctionCallNode::codegen_writeln(std::unique_ptr<Context> &c
     ArgsV.push_back(loadedStdOut);
     if (context->TargetTriple->getOS() == llvm::Triple::Win32)
     {
-        ArgsV.push_back(context->builder()->CreateGlobalString("\r\n"));
+        ArgsV.push_back(context->getOrCreateGlobalString("\r\n", "new_line"));
     }
     else
     {
-        ArgsV.push_back(context->builder()->CreateGlobalString("\n"));
+        ArgsV.push_back(context->getOrCreateGlobalString("\n", "new_line"));
     }
     context->builder()->CreateCall(fprintf, ArgsV);
 

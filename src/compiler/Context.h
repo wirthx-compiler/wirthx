@@ -11,6 +11,8 @@
 
 namespace llvm
 {
+    class GlobalValue;
+    class GlobalVariable;
     class LLVMContext;
     class Module;
 
@@ -77,6 +79,7 @@ public:
     llvm::Function *functionDefinition(const std::string &string) const;
 
     std::optional<llvm::Value *> findValue(const std::string &name) const;
+    llvm::GlobalVariable *getOrCreateGlobalString(const std::string &value, const std::string &name = "") const;
 };
 
 void LogError(const char *Str);

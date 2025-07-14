@@ -188,8 +188,7 @@ void createResetCall(std::unique_ptr<Context> &context)
                                     llvm::Function *printfCall = ctx->module()->getFunction("printf");
 
                                     std::vector<llvm::Value *> argsV = {};
-                                    argsV.push_back(ctx->builder()->CreateGlobalString(
-                                            "file with the name %s not found!", "format_string"));
+                                    argsV.push_back(ctx->getOrCreateGlobalString("file with the name %s not found!"));
                                     argsV.push_back(fileName);
                                     ctx->builder()->CreateCall(printfCall, argsV);
                                 }
@@ -241,8 +240,7 @@ void createRewriteCall(std::unique_ptr<Context> &context)
                                     llvm::Function *calleF = ctx->module()->getFunction("printf");
 
                                     std::vector<llvm::Value *> argsV = {};
-                                    argsV.push_back(ctx->builder()->CreateGlobalString(
-                                            "file with the name %s not found!", "format_string"));
+                                    argsV.push_back(ctx->getOrCreateGlobalString("file with the name %s not found!"));
                                     argsV.push_back(fileName);
                                     ctx->builder()->CreateCall(calleF, argsV);
                                 }

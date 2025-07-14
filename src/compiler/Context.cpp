@@ -194,3 +194,16 @@ std::optional<llvm::Value *> Context::findValue(const std::string &name) const
     }
     return V ? std::make_optional(V) : std::nullopt;
 }
+llvm::GlobalVariable *Context::getOrCreateGlobalString(const std::string &value, const std::string &name) const
+{
+    auto _name = name;
+    if (_name.empty())
+    {
+        auto hash = std::hash<std::string>{}(value);
+        _name = "string." + std::to_string(hash);
+    }
+
+    if (const auto var = m_impl->TheModule->getGlobalVariable(_name, true))
+        return var;
+    return builder()->CreateGlobalString(value, _name);
+}
