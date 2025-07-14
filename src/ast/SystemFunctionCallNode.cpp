@@ -1,13 +1,11 @@
 #include "SystemFunctionCallNode.h"
 
+#include <compiler/codegen.h>
 #include <iostream>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/TargetParser/Triple.h>
 #include <utility>
 #include <vector>
-
-#include <compiler/codegen.h>
-
 #include "../compare.h"
 #include "UnitNode.h"
 #include "compiler/Context.h"
@@ -430,15 +428,7 @@ llvm::Value *SystemFunctionCallNode::codegen_new(std::unique_ptr<Context> &conte
 }
 llvm::Value *SystemFunctionCallNode::codegen(std::unique_ptr<Context> &context)
 {
-    ASTNode *parent = context->programUnit().get();
-    if (context->currentFunction())
-    {
-        if (const auto def =
-                    context->programUnit()->getFunctionDefinition(std::string(context->currentFunction()->getName())))
-        {
-            parent = def.value().get();
-        }
-    }
+    ASTNode *parent = resolveParent(context);
 
     if (iequals(m_name, "low"))
     {

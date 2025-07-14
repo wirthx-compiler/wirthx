@@ -90,35 +90,7 @@ llvm::Value *VariableAssignmentNode::codegen(std::unique_ptr<Context> &context)
         auto variable_definition = context->programUnit()->getVariableDefinition(m_variableName);
         std::shared_ptr<VariableType> varType =
                 (variable_definition) ? variable_definition.value().variableType : nullptr;
-        if (context->currentFunction() && !variable_definition)
-        {
-            if (const auto def =
-                        context->programUnit()->getFunctionDefinition(context->currentFunction()->getName().str()))
-            {
-                variable_definition = def.value()->body()->getVariableDefinition(m_variableName);
 
-                if (!variable_definition)
-                {
-                    varType = def.value()->getParam(m_variableName)->type;
-                }
-                else
-                {
-                    varType = variable_definition->variableType;
-                }
-            }
-        }
-        // TODO not everything is allocated by malloc this needs proper ref counting
-        // if (varType->baseType == VariableBaseType::String)
-        // {
-        //     auto stringStructPtr = allocatedValue;
-        //     const auto arrayPointerOffset =
-        //             context->builder()->CreateStructGEP(type, stringStructPtr, 2, m_variableName + ".ptr.offset");
-        //     // auto strValuePtr = context->builder()->CreateLoad(llvm::PointerType::getUnqual(*context->context()),
-        //     //                                                 arrayPointerOffset, m_variableName + ".loaded");
-        //
-        //     context->builder()->CreateCall(context->module()->getFunction("freemem(integer8_ptr)"),
-        //                                  llvm::ArrayRef<llvm::Value *>{arrayPointerOffset});
-        // }
 
         auto llvmArgType = type;
 
@@ -169,10 +141,6 @@ llvm::Value *VariableAssignmentNode::codegen(std::unique_ptr<Context> &context)
             }
             return expressionResult;
         }
-
-        // auto resultType = m_expression->resolveType(context->programUnit(), resolveParent(context));
-
-        // expressionResult = context->builder()->CreateLoad(resultType->generateLlvmType(context), expressionResult);
     }
 
     context->builder()->CreateStore(expressionResult, allocatedValue);

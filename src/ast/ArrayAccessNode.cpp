@@ -83,22 +83,8 @@ Token ArrayAccessNode::expressionToken()
 
 llvm::Value *ArrayAccessNode::codegen(std::unique_ptr<Context> &context)
 {
-    const llvm::Value *V = context->namedAllocation(m_arrayNameToken.lexical());
 
-
-    if (!V)
-    {
-        for (auto &arg: context->currentFunction()->args())
-        {
-            if (arg.getName() == m_arrayNameToken.lexical())
-            {
-                V = context->currentFunction()->getArg(arg.getArgNo());
-                break;
-            }
-        }
-    }
-
-    if (!V)
+    if (!context->findValue(m_arrayNameToken.lexical()))
         return LogErrorV("Unknown variable for array access: " + m_arrayNameToken.lexical());
 
     const auto parent = resolveParent(context);

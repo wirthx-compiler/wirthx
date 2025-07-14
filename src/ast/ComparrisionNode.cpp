@@ -1,7 +1,6 @@
 #include <cassert>
 #include <iostream>
 #include <llvm/IR/IRBuilder.h>
-
 #include "ComparissionNode.h"
 #include "UnitNode.h"
 #include "compiler/Context.h"
@@ -102,14 +101,7 @@ llvm::Value *ComparrisionNode::codegen(std::unique_ptr<Context> &context)
         }
     }
 
-    ASTNode *parent = context->programUnit().get();
-    if (context->currentFunction())
-    {
-        if (auto def = context->programUnit()->getFunctionDefinition(context->currentFunction()->getName().str()))
-        {
-            parent = def.value().get();
-        }
-    }
+    ASTNode *parent = resolveParent(context);
 
     auto lhsType = m_lhs->resolveType(context->programUnit(), parent);
     auto rhsType = m_rhs->resolveType(context->programUnit(), parent);

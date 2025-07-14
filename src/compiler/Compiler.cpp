@@ -3,7 +3,6 @@
 #include <MacroParser.h>
 #include <filesystem>
 #include <fstream>
-#include <iostream>
 #include <sstream>
 #include "Lexer.h"
 #include "Parser.h"
@@ -20,7 +19,6 @@
 #include "llvm/IR/Verifier.h"
 #include "llvm/LTO/LTO.h"
 #include "llvm/MC/TargetRegistry.h"
-#include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/StandardInstrumentations.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/TargetSelect.h"
@@ -29,15 +27,7 @@
 #include "llvm/Target/TargetOptions.h"
 #include "llvm/TargetParser/Host.h"
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
-#include "llvm/Transforms/IPO/GlobalDCE.h"
-#include "llvm/Transforms/IPO/PartialInlining.h"
 #include "llvm/Transforms/InstCombine/InstCombine.h"
-#include "llvm/Transforms/Scalar/DCE.h"
-#include "llvm/Transforms/Scalar/GVN.h"
-#include "llvm/Transforms/Scalar/MemCpyOptimizer.h"
-#include "llvm/Transforms/Scalar/Reassociate.h"
-#include "llvm/Transforms/Scalar/SCCP.h"
-#include "llvm/Transforms/Scalar/SimplifyCFG.h"
 #include "os/command.h"
 
 static auto TargetTriple = llvm::sys::getDefaultTargetTriple();

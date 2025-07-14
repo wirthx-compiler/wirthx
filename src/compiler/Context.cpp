@@ -18,7 +18,10 @@
 #include <llvm/Transforms/Scalar/SimplifyCFG.h>
 #include <llvm/Transforms/Utils/LoopSimplify.h>
 
+#include <utility>
+
 #include "ast/UnitNode.h"
+#include "compare.h"
 
 
 void LogError(const char *Str) { fprintf(stderr, "Error: %s\n", Str); }
@@ -42,7 +45,7 @@ struct ContextImpl
     std::unique_ptr<llvm::IRBuilder<llvm::ConstantFolder, llvm::IRBuilderDefaultInserter>> Builder;
     std::unordered_map<std::string, llvm::AllocaInst *> NamedAllocations;
     std::unordered_map<std::string, llvm::Value *> NamedValues;
-    llvm::Function *TopLevelFunction;
+    llvm::Function *TopLevelFunction{};
     std::unordered_map<std::string, llvm::Function *> FunctionDefinitions;
     BreakBasicBlock BreakBlock;
 
@@ -55,8 +58,8 @@ struct ContextImpl
 };
 
 
-Context::Context(std::unique_ptr<UnitNode> &unit, const CompilerOptions &options, const std::string &TargetTriple) :
-    compilerOptions(options)
+Context::Context(std::unique_ptr<UnitNode> &unit, CompilerOptions options, const std::string &TargetTriple) :
+    compilerOptions(std::move(options))
 {
     m_impl = std::make_shared<ContextImpl>();
 
@@ -69,10 +72,9 @@ Context::Context(std::unique_ptr<UnitNode> &unit, const CompilerOptions &options
     // Create new pass and analysis managers.
     m_impl->TheFPM = std::make_unique<llvm::FunctionPassManager>();
     m_impl->TheMPM = std::make_unique<llvm::ModulePassManager>();
-    const auto TheLAM = std::make_unique<llvm::LoopAnalysisManager>();
     m_impl->TheFAM = std::make_unique<llvm::FunctionAnalysisManager>();
-    const auto TheCGAM = std::make_unique<llvm::CGSCCAnalysisManager>();
     m_impl->TheMAM = std::make_unique<llvm::ModuleAnalysisManager>();
+
     m_impl->ThePIC = std::make_unique<llvm::PassInstrumentationCallbacks>();
     m_impl->TheSI = std::make_unique<llvm::StandardInstrumentations>(*m_impl->TheContext,
                                                                      /*DebugLogging*/ true);
@@ -113,11 +115,10 @@ Context::Context(std::unique_ptr<UnitNode> &unit, const CompilerOptions &options
                 llvm::DCEPass())); // Remove dead functions and global variables.
     }
 
-
-    // m_impl->TheFPM->addPass(llvm::createLoopSimplifyPass());
-
     // Register analysis passes used in these transform passes.
     llvm::PassBuilder PB;
+    const auto TheLAM = std::make_unique<llvm::LoopAnalysisManager>();
+    const auto TheCGAM = std::make_unique<llvm::CGSCCAnalysisManager>();
 
     PB.registerModuleAnalyses(*m_impl->TheMAM);
     PB.registerFunctionAnalyses(*m_impl->TheFAM);
@@ -134,10 +135,7 @@ llvm::Value *Context::namedValue(const std::string &name) const { return m_impl-
 BreakBasicBlock &Context::breakBlock() const { return m_impl->BreakBlock; }
 std::unique_ptr<llvm::LLVMContext> &Context::context() const { return m_impl->TheContext; }
 std::unique_ptr<UnitNode> &Context::programUnit() { return ProgramUnit; }
-std::unique_ptr<llvm::IRBuilder<llvm::ConstantFolder, llvm::IRBuilderDefaultInserter>> &Context::builder() const
-{
-    return m_impl->Builder;
-}
+std::unique_ptr<llvm::IRBuilder<>> &Context::builder() const { return m_impl->Builder; }
 void Context::verifyModule(llvm::Function *function) const
 {
     llvm::verifyFunction(*function, &llvm::errs());
@@ -177,4 +175,22 @@ void Context::addFunctionDefinition(const std::string &function_signature, llvm:
 llvm::Function *Context::functionDefinition(const std::string &string) const
 {
     return m_impl->FunctionDefinitions[string];
+}
+std::optional<llvm::Value *> Context::findValue(const std::string &name) const
+{
+    llvm::Value *V = namedAllocation(name);
+
+
+    if (!V)
+    {
+        for (auto &arg: currentFunction()->args())
+        {
+            if (iequals(arg.getName(), name))
+            {
+                V = currentFunction()->getArg(arg.getArgNo());
+                break;
+            }
+        }
+    }
+    return V ? std::make_optional(V) : std::nullopt;
 }

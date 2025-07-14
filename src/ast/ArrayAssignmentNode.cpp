@@ -1,6 +1,4 @@
 #include "ArrayAssignmentNode.h"
-
-
 #include "ArrayAccessNode.h"
 #include "SystemFunctionCallNode.h"
 #include "UnitNode.h"
@@ -49,19 +47,7 @@ void ArrayAssignmentNode::range_check(const std::shared_ptr<FieldAccessableType>
 llvm::Value *ArrayAssignmentNode::codegen(std::unique_ptr<Context> &context)
 {
     // Look this variable up in the function.
-    llvm::Value *V = context->namedAllocation(m_variableName);
-
-    if (!V && context->currentFunction())
-    {
-        for (auto &arg: context->currentFunction()->args())
-        {
-            if (arg.getName() == m_variableName)
-            {
-                V = context->currentFunction()->getArg(arg.getArgNo());
-                break;
-            }
-        }
-    }
+    auto V = context->findValue(m_variableName);
 
     if (!V)
         return LogErrorV("Unknown variable name for array assignment: " + m_variableName);
@@ -80,8 +66,7 @@ llvm::Value *ArrayAssignmentNode::codegen(std::unique_ptr<Context> &context)
             arrayDef = functionDef.value()->body()->getVariableDefinition(m_variableName);
             if (!arrayDef)
             {
-                const auto param = functionDef.value()->getParam(m_variableName);
-                if (param)
+                if (const auto param = functionDef.value()->getParam(m_variableName))
                     variableType = param.value().type;
             }
         }
@@ -128,7 +113,7 @@ llvm::Value *ArrayAssignmentNode::codegen(std::unique_ptr<Context> &context)
             const auto arrayBaseType = def->arrayBase->generateLlvmType(context);
 
             const auto arrayPointerOffset =
-                    context->builder()->CreateStructGEP(llvmRecordType, V, 1, "array.ptr.offset");
+                    context->builder()->CreateStructGEP(llvmRecordType, V.value(), 1, "array.ptr.offset");
 
             const auto loadResult = context->builder()->CreateLoad(llvm::PointerType::getUnqual(*context->context()),
                                                                    arrayPointerOffset);
@@ -141,8 +126,8 @@ llvm::Value *ArrayAssignmentNode::codegen(std::unique_ptr<Context> &context)
             return result;
         }
 
-        const auto bounds = context->builder()->CreateGEP(llvmRecordType, V, {context->builder()->getInt64(0), index},
-                                                          "arrayindex", false);
+        const auto bounds = context->builder()->CreateGEP(
+                llvmRecordType, V.value(), {context->builder()->getInt64(0), index}, "arrayindex", false);
 
         context->builder()->CreateStore(result, bounds);
         return result;
@@ -154,7 +139,8 @@ llvm::Value *ArrayAssignmentNode::codegen(std::unique_ptr<Context> &context)
         const auto llvmRecordType = def->generateLlvmType(context);
         const auto arrayBaseType = IntegerType::getInteger(8)->generateLlvmType(context);
 
-        const auto arrayPointerOffset = context->builder()->CreateStructGEP(llvmRecordType, V, 2, "array.ptr.offset");
+        const auto arrayPointerOffset =
+                context->builder()->CreateStructGEP(llvmRecordType, V.value(), 2, "array.ptr.offset");
 
         const auto loadResult =
                 context->builder()->CreateLoad(llvm::PointerType::getUnqual(*context->context()), arrayPointerOffset);
@@ -171,7 +157,8 @@ llvm::Value *ArrayAssignmentNode::codegen(std::unique_ptr<Context> &context)
         const auto arrayBaseType = ptrType->pointerBase->generateLlvmType(context);
 
 
-        const auto loadResult = context->builder()->CreateLoad(llvm::PointerType::getUnqual(*context->context()), V);
+        const auto loadResult =
+                context->builder()->CreateLoad(llvm::PointerType::getUnqual(*context->context()), V.value());
 
 
         const auto bounds = context->builder()->CreateGEP(arrayBaseType, loadResult,

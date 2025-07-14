@@ -48,14 +48,7 @@ std::string FunctionCallNode::callSignature(const std::unique_ptr<UnitNode> &uni
 llvm::Value *FunctionCallNode::codegen(std::unique_ptr<Context> &context)
 {
     // Look up the name in the global module table.
-    ASTNode *parent = context->programUnit().get();
-    if (context->currentFunction())
-    {
-        if (auto def = context->programUnit()->getFunctionDefinition(context->currentFunction()->getName().str()))
-        {
-            parent = def.value().get();
-        }
-    }
+    ASTNode *parent = resolveParent(context);
 
     std::string functionName = callSignature(context->programUnit(), parent);
 

@@ -3,7 +3,6 @@
 #include <cassert>
 #include <llvm/IR/IRBuilder.h>
 #include <utility>
-
 #include "compiler/Context.h"
 #include "exceptions/CompilerException.h"
 #include "types/ValueRangeType.h"
@@ -19,7 +18,7 @@ void CaseNode::print() {}
 llvm::Value *CaseNode::codegen_constants(std::unique_ptr<Context> &context)
 {
     const auto value = m_selector->codegen(context);
-    auto function = context->builder()->GetInsertBlock()->getParent();
+    const auto function = context->builder()->GetInsertBlock()->getParent();
     llvm::BasicBlock *defaultBlock = llvm::BasicBlock::Create(*context->context(), "default", function);
     llvm::BasicBlock *endBlock = llvm::BasicBlock::Create(*context->context(), "caseEnd", function);
     const auto switchInstruction = context->builder()->CreateSwitch(value, defaultBlock, m_selectors.size() + 1);
@@ -113,9 +112,9 @@ llvm::Value *CaseNode::compareSelectorAndValue(llvm::Value *value, const std::sh
 
         return context->builder()->CreateAnd(
                 context->builder()->CreateICmpSGE(value,
-                                                range->generateLowerBounds(selector->expressionToken(), context)),
+                                                  range->generateLowerBounds(selector->expressionToken(), context)),
                 context->builder()->CreateICmpSLE(value,
-                                                range->generateUpperBounds(selector->expressionToken(), context)));
+                                                  range->generateUpperBounds(selector->expressionToken(), context)));
     }
 
     const auto selectorValue = selector->codegen(context);

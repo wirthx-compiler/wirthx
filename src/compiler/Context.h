@@ -45,7 +45,6 @@ struct ContextImpl;
 
 class Context
 {
-private:
     CompilerOptions compilerOptions;
     std::shared_ptr<ContextImpl> m_impl;
     std::unique_ptr<UnitNode> ProgramUnit;
@@ -56,7 +55,7 @@ public:
     std::unique_ptr<llvm::Triple> TargetTriple;
 
 
-    explicit Context(std::unique_ptr<UnitNode> &unit, const CompilerOptions &options, const std::string &TargetTriple);
+    explicit Context(std::unique_ptr<UnitNode> &unit, CompilerOptions options, const std::string &TargetTriple);
 
     std::unique_ptr<llvm::Module> &module() const;
     llvm::Function *currentFunction() const;
@@ -76,6 +75,8 @@ public:
     void setNamedValue(const std::string &name, llvm::Value *value) const;
     void addFunctionDefinition(const std::string &function_signature, llvm::Function *function) const;
     llvm::Function *functionDefinition(const std::string &string) const;
+
+    std::optional<llvm::Value *> findValue(const std::string &name) const;
 };
 
 void LogError(const char *Str);

@@ -76,19 +76,7 @@ llvm::Type *ArrayType::generateLlvmType(std::unique_ptr<Context> &context)
 llvm::Value *ArrayType::generateFieldAccess(Token &token, llvm::Value *indexValue, std::unique_ptr<Context> &context)
 {
     const auto arrayName = std::string(token.lexical());
-    llvm::Value *arrayAllocation = context->namedAllocation(arrayName);
-
-    if (!arrayAllocation)
-    {
-        for (auto &arg: context->currentFunction()->args())
-        {
-            if (arg.getName() == arrayName)
-            {
-                arrayAllocation = context->currentFunction()->getArg(arg.getArgNo());
-                break;
-            }
-        }
-    }
+    const auto arrayAllocation = context->findValue(arrayName);
 
 
     if (!arrayAllocation)
@@ -100,7 +88,7 @@ llvm::Value *ArrayType::generateFieldAccess(Token &token, llvm::Value *indexValu
         const auto arrayBaseType = this->arrayBase->generateLlvmType(context);
 
         const auto arrayPointerOffset =
-                context->builder()->CreateStructGEP(llvmRecordType, arrayAllocation, 1, "array.ptr.offset");
+                context->builder()->CreateStructGEP(llvmRecordType, arrayAllocation.value(), 1, "array.ptr.offset");
         // const llvm::DataLayout &DL = context->module()->getDataLayout();
         // auto alignment = DL.getPrefTypeAlign(ptrType);
         const auto loadResult =
@@ -132,36 +120,22 @@ llvm::Value *ArrayType::generateFieldAccess(Token &token, llvm::Value *indexValu
 
     const auto arrayType = this->generateLlvmType(context);
     const auto arrayValue = context->builder()->CreateGEP(
-            arrayType, arrayAllocation, {context->builder()->getInt64(0), index}, "arrayindex", false);
+            arrayType, arrayAllocation.value(), {context->builder()->getInt64(0), index}, "arrayindex", false);
     return context->builder()->CreateLoad(arrayType->getArrayElementType(), arrayValue);
 }
 llvm::Value *ArrayType::generateLengthValue(const Token &token, std::unique_ptr<Context> &context)
 {
     const auto arrayName = std::string(token.lexical());
-    llvm::Value *value = context->namedAllocation(arrayName);
-
-    if (!value)
-    {
-        for (auto &arg: context->currentFunction()->args())
-        {
-            if (arg.getName() == arrayName)
-            {
-                value = context->currentFunction()->getArg(arg.getArgNo());
-                break;
-            }
-        }
-    }
-
-
+    const auto value = context->findValue(arrayName);
     if (!value)
         return LogErrorV("Unknown variable for array access: " + arrayName);
-
 
     if (isDynArray)
     {
         const auto llvmRecordType = generateLlvmType(context);
 
-        const auto arraySizeOffset = context->builder()->CreateStructGEP(llvmRecordType, value, 0, "array.size.offset");
+        const auto arraySizeOffset =
+                context->builder()->CreateStructGEP(llvmRecordType, value.value(), 0, "array.size.offset");
         const auto indexType = VariableType::getInteger(64)->generateLlvmType(context);
 
         return context->builder()->CreateLoad(indexType, arraySizeOffset);
