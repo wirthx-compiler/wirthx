@@ -13,6 +13,7 @@
 #include <unordered_map>
 
 #include "ast/types/ArrayType.h"
+#include "ast/types/TypeRegistry.h"
 
 
 class EnumType;
@@ -25,7 +26,7 @@ class Parser
     size_t m_current = 0;
     std::vector<Token> m_tokens;
     std::vector<ParserError> m_errors;
-    std::unordered_map<std::string, std::shared_ptr<VariableType>> m_typeDefinitions;
+    TypeRegistry m_typeDefinitions;
     std::vector<VariableDefinition> m_known_variable_definitions;
     std::vector<std::string> m_known_function_names;
     std::vector<std::shared_ptr<FunctionDefinitionNode>> m_functionDeclarations;

@@ -16,7 +16,7 @@ ValueRangeType::ValueRangeType(const std::string &name, int64_t startValue, int6
 llvm::Type *ValueRangeType::generateLlvmType(std::unique_ptr<Context> &context)
 {
 
-    return context->Builder->getIntNTy(length());
+    return context->builder()->getIntNTy(length());
 }
 size_t ValueRangeType::length() const
 {

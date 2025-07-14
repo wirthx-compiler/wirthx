@@ -2,6 +2,7 @@
 #include <iostream>
 #include <llvm/IR/IRBuilder.h>
 
+#include "UnitNode.h"
 #include "compiler/Context.h"
 #include "types/StringType.h"
 
@@ -51,7 +52,7 @@ llvm::GlobalVariable *StringConstantNode::generateConstant(std::unique_ptr<Conte
     }
 
 
-    auto resultVar = context->Builder->CreateGlobalString(result, ".str", 0, context->TheModule.get());
+    auto resultVar = context->getOrCreateGlobalString(result);
     resultVar->setLinkage(llvm::GlobalValue::PrivateLinkage);
     return resultVar;
 }
@@ -59,28 +60,28 @@ llvm::Value *StringConstantNode::codegen(std::unique_ptr<Context> &context)
 {
     std::string result;
     llvm::GlobalVariable *const constant = generateConstant(context, result);
-    if (context->TopLevelFunction)
+    if (context->currentFunction())
     {
-        const auto varType = StringType::getString();
+        const auto varType = context->programUnit()->getTypeDefinitions().getType("string");
         const auto llvmRecordType = varType->generateLlvmType(context);
-        const auto stringAlloc = context->Builder->CreateAlloca(llvmRecordType, nullptr, "string_constant");
+        const auto stringAlloc = context->builder()->CreateAlloca(llvmRecordType, nullptr, "string_constant");
 
 
         const auto arrayRefCountOffset =
-                context->Builder->CreateStructGEP(llvmRecordType, stringAlloc, 0, "string.refCount.offset");
+                context->builder()->CreateStructGEP(llvmRecordType, stringAlloc, 0, "string.refCount.offset");
         const auto arraySizeOffset =
-                context->Builder->CreateStructGEP(llvmRecordType, stringAlloc, 1, "string.size.offset");
+                context->builder()->CreateStructGEP(llvmRecordType, stringAlloc, 1, "string.size.offset");
 
 
         const auto arrayPointerOffset =
-                context->Builder->CreateStructGEP(llvmRecordType, stringAlloc, 2, "string.ptr.offset");
+                context->builder()->CreateStructGEP(llvmRecordType, stringAlloc, 2, "string.ptr.offset");
         // auto arrayPointer =
-        //         context->Builder->CreateAlignedLoad(arrayBaseType, arrayPointerOffset, alignment, "array.ptr");
-        const auto newSize = context->Builder->getInt64(result.size() + 1);
+        //         context->builder()->CreateAlignedLoad(arrayBaseType, arrayPointerOffset, alignment, "array.ptr");
+        const auto newSize = context->builder()->getInt64(result.size() + 1);
         // change array size
-        context->Builder->CreateStore(context->Builder->getInt64(1), arrayRefCountOffset);
-        context->Builder->CreateStore(newSize, arraySizeOffset);
-        context->Builder->CreateStore(constant, arrayPointerOffset);
+        context->builder()->CreateStore(context->builder()->getInt64(1), arrayRefCountOffset);
+        context->builder()->CreateStore(newSize, arraySizeOffset);
+        context->builder()->CreateStore(constant, arrayPointerOffset);
 
         return stringAlloc;
     }
@@ -93,7 +94,7 @@ llvm::Value *StringConstantNode::codegenForTargetType(std::unique_ptr<Context> &
     {
         return codegen(context);
     }
-    else if (targetType->baseType == VariableBaseType::Pointer)
+    if (targetType->baseType == VariableBaseType::Pointer)
     {
         std::string result;
         return generateConstant(context, result);

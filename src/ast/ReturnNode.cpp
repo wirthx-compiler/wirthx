@@ -20,6 +20,6 @@ void ReturnNode::print()
 llvm::Value *ReturnNode::codegen(std::unique_ptr<Context> &context)
 {
     auto RetVal = m_expression->codegen(context);
-    context->Builder->CreateRet(RetVal);
+    context->builder()->CreateRet(RetVal);
     return nullptr;
 }

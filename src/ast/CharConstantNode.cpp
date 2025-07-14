@@ -10,7 +10,7 @@ CharConstantNode::CharConstantNode(const Token &token, std::string_view literal)
 void CharConstantNode::print() {}
 llvm::Value *CharConstantNode::codegen(std::unique_ptr<Context> &context)
 {
-    return llvm::ConstantInt::get(*context->TheContext, llvm::APInt(8, m_literal));
+    return llvm::ConstantInt::get(*context->context(), llvm::APInt(8, m_literal));
 }
 
 std::shared_ptr<VariableType> CharConstantNode::resolveType(const std::unique_ptr<UnitNode> &unit, ASTNode *parentNode)

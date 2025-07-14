@@ -85,6 +85,7 @@ file(GLOB SRC
         src/ast/types/EnumType.cpp
         src/ast/types/ValueRangeType.cpp
         src/ast/types/ArrayType.cpp
+        src/ast/types/TypeRegistry.cpp
         src/ast/ForNode.cpp
         src/ast/ForEachNode.cpp
         src/ast/RepeatUntilNode.cpp

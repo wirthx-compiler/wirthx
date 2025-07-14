@@ -9,25 +9,22 @@
 #include "compiler/intrinsics.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/PassManager.h"
-#include "llvm/IR/Verifier.h"
 #include "types/FileType.h"
 
 
 UnitNode::UnitNode(const Token &token, const UnitType unitType, const std::string &unitName,
                    const std::vector<std::shared_ptr<FunctionDefinitionNode>> &functionDefinitions,
-                   const std::unordered_map<std::string, std::shared_ptr<VariableType>> &typeDefinitions,
-                   const std::shared_ptr<BlockNode> &blockNode) :
+                   const TypeRegistry &typeDefinitions, const std::shared_ptr<BlockNode> &blockNode) :
     ASTNode(token), m_unitType(unitType), m_unitName(unitName), m_functionDefinitions(functionDefinitions),
-    m_typeDefinitions(typeDefinitions), m_blockNode(blockNode)
+    m_typeDefinitions(std::move(typeDefinitions)), m_blockNode(blockNode)
 {
 }
-UnitNode::UnitNode(const Token &token, UnitType unitType, const std::string &unitName,
+UnitNode::UnitNode(const Token &token, const UnitType unitType, const std::string &unitName,
                    const std::vector<std::string> &argumentNames,
                    const std::vector<std::shared_ptr<FunctionDefinitionNode>> &functionDefinitions,
-                   const std::unordered_map<std::string, std::shared_ptr<VariableType>> &typeDefinitions,
-                   const std::shared_ptr<BlockNode> &blockNode) :
+                   const TypeRegistry &typeDefinitions, const std::shared_ptr<BlockNode> &blockNode) :
     ASTNode(token), m_unitType(unitType), m_unitName(unitName), m_functionDefinitions(functionDefinitions),
-    m_typeDefinitions(typeDefinitions), m_blockNode(blockNode), m_argumentNames(argumentNames)
+    m_typeDefinitions(std::move(typeDefinitions)), m_blockNode(blockNode), m_argumentNames(argumentNames)
 {
 }
 
@@ -42,7 +39,7 @@ void UnitNode::print()
         std::cout << "unit ";
     }
     std::cout << m_unitName << "\n";
-    for (auto def: m_functionDefinitions)
+    for (const auto &def: m_functionDefinitions)
     {
         def->print();
     }
@@ -98,31 +95,31 @@ llvm::Value *UnitNode::codegen(std::unique_ptr<Context> &context)
         // #define stderr (__acrt_iob_func(2))
         if (context->TargetTriple->getOS() == llvm::Triple::Win32)
         {
-            auto cFile = llvm::PointerType::getUnqual(*context->TheContext);
+            auto cFile = llvm::PointerType::getUnqual(*context->context());
             auto ext_stdout =
-                    new llvm::GlobalVariable(*context->TheModule, cFile, false, llvm::GlobalValue::InternalLinkage,
+                    new llvm::GlobalVariable(*context->module(), cFile, false, llvm::GlobalValue::InternalLinkage,
                                              llvm::ConstantPointerNull::get(cFile), "stdout");
 
             // ext_stdout->setExternallyInitialized(true);
-            context->NamedValues["stdout"] = ext_stdout;
+            context->setNamedValue("stdout", ext_stdout);
             // ext_stdout->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Local);
 
             auto ext_stderr =
-                    new llvm::GlobalVariable(*context->TheModule, cFile, false, llvm::GlobalValue::InternalLinkage,
+                    new llvm::GlobalVariable(*context->module(), cFile, false, llvm::GlobalValue::InternalLinkage,
                                              llvm::ConstantPointerNull::get(cFile), "stderr");
-            context->NamedValues["stderr"] = ext_stderr;
+            context->setNamedValue("stderr", ext_stderr);
 
             auto ext_stdin =
-                    new llvm::GlobalVariable(*context->TheModule, cFile, false, llvm::GlobalValue::InternalLinkage,
+                    new llvm::GlobalVariable(*context->module(), cFile, false, llvm::GlobalValue::InternalLinkage,
                                              llvm::ConstantPointerNull::get(cFile), "stdin");
             // ext_stdin->setExternallyInitialized(true);
-            context->NamedValues["stdin"] = ext_stdin;
+            context->setNamedValue("stdin", ext_stdin);
         }
         else
         {
-            auto cFile = llvm::PointerType::getUnqual(*context->TheContext);
-            auto fileType = FileType::getFileType();
-            auto ext_stderr = new llvm::GlobalVariable(*context->TheModule, cFile, false,
+            auto cFile = llvm::PointerType::getUnqual(*context->context());
+            auto fileType = context->programUnit()->getTypeDefinitions().getType("file");
+            auto ext_stderr = new llvm::GlobalVariable(*context->module(), cFile, false,
                                                        llvm::GlobalValue::ExternalLinkage, nullptr, "stderr");
             // ext_stderr->setExternallyInitialized(true);
             ext_stderr->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Local);
@@ -135,11 +132,11 @@ llvm::Value *UnitNode::codegen(std::unique_ptr<Context> &context)
                                                                       .constant = false});
             }
 
-            context->NamedValues["stderr"] = ext_stderr;
-            auto ext_stdout = new llvm::GlobalVariable(*context->TheModule, cFile, false,
+            context->setNamedValue("stderr", ext_stderr);
+            auto ext_stdout = new llvm::GlobalVariable(*context->module(), cFile, false,
                                                        llvm::GlobalValue::ExternalLinkage, nullptr, "stdout");
             // ext_stdout->setExternallyInitialized(true);
-            context->NamedValues["stdout"] = ext_stdout;
+            context->setNamedValue("stdout", ext_stdout);
             if (m_argumentNames.size() >= 2)
             {
                 m_blockNode->addVariableDefinition(VariableDefinition{.variableType = fileType,
@@ -148,10 +145,10 @@ llvm::Value *UnitNode::codegen(std::unique_ptr<Context> &context)
                                                                       .llvmValue = ext_stdout,
                                                                       .constant = false});
             }
-            auto ext_stdin = new llvm::GlobalVariable(*context->TheModule, cFile, false,
+            auto ext_stdin = new llvm::GlobalVariable(*context->module(), cFile, false,
                                                       llvm::GlobalValue::ExternalLinkage, nullptr, "stdin");
             // ext_stdin->setExternallyInitialized(true);
-            context->NamedValues["stdin"] = ext_stdin;
+            context->setNamedValue("stdin", ext_stdin);
             if (!m_argumentNames.empty())
             {
                 m_blockNode->addVariableDefinition(VariableDefinition{.variableType = fileType,
@@ -170,7 +167,7 @@ llvm::Value *UnitNode::codegen(std::unique_ptr<Context> &context)
     {
         fdef->codegen(context);
     }
-    llvm::FunctionType *FT = llvm::FunctionType::get(llvm::Type::getInt32Ty(*context->TheContext), params, false);
+    llvm::FunctionType *FT = llvm::FunctionType::get(llvm::Type::getInt32Ty(*context->context()), params, false);
 
     std::string functionName = m_unitName;
     if (m_unitType == UnitType::PROGRAM)
@@ -179,44 +176,44 @@ llvm::Value *UnitNode::codegen(std::unique_ptr<Context> &context)
     }
 
     llvm::Function *F =
-            llvm::Function::Create(FT, llvm::Function::ExternalLinkage, functionName, context->TheModule.get());
-    context->TopLevelFunction = F;
-    llvm::BasicBlock *BB = llvm::BasicBlock::Create(*context->TheContext, "entry", context->TopLevelFunction);
-    context->Builder->SetInsertPoint(BB);
+            llvm::Function::Create(FT, llvm::Function::ExternalLinkage, functionName, context->module().get());
+    context->setCurrentFunction(F);
+    llvm::BasicBlock *BB = llvm::BasicBlock::Create(*context->context(), "entry", context->currentFunction());
+    context->builder()->SetInsertPoint(BB);
     if (context->TargetTriple->getOS() == llvm::Triple::Win32)
     {
-        llvm::Function *CalleeF = context->TheModule->getFunction("__acrt_iob_func");
-        auto stdOutArgs = llvm::ArrayRef<llvm::Value *>{context->Builder->getInt32(1)};
-        auto stdOutPtr = context->Builder->CreateCall(CalleeF, stdOutArgs);
-        context->Builder->CreateStore(stdOutPtr, context->NamedValues["stdout"]);
+        llvm::Function *CalleeF = context->module()->getFunction("__acrt_iob_func");
+        auto stdOutArgs = llvm::ArrayRef<llvm::Value *>{context->builder()->getInt32(1)};
+        auto stdOutPtr = context->builder()->CreateCall(CalleeF, stdOutArgs);
+        context->builder()->CreateStore(stdOutPtr, context->namedValue("stdout"));
 
         auto stdInPtr =
-                context->Builder->CreateCall(CalleeF, llvm::ArrayRef<llvm::Value *>{context->Builder->getInt32(0)});
-        context->Builder->CreateStore(stdInPtr, context->NamedValues["stdin"]);
+                context->builder()->CreateCall(CalleeF, llvm::ArrayRef<llvm::Value *>{context->builder()->getInt32(0)});
+        context->builder()->CreateStore(stdInPtr, context->namedValue("stdin"));
         auto stdErrPtr =
-                context->Builder->CreateCall(CalleeF, llvm::ArrayRef<llvm::Value *>{context->Builder->getInt32(2)});
+                context->builder()->CreateCall(CalleeF, llvm::ArrayRef<llvm::Value *>{context->builder()->getInt32(2)});
 
-        context->Builder->CreateStore(stdErrPtr, context->NamedValues["stderr"]);
+        context->builder()->CreateStore(stdErrPtr, context->namedValue("stderr"));
 
         if (m_argumentNames.size() >= 2)
         {
-            auto fileType = FileType::getFileType();
+            auto fileType = context->programUnit()->getTypeDefinitions().getType("file");
 
 
             m_blockNode->addVariableDefinition(VariableDefinition{.variableType = fileType,
                                                                   .variableName = m_argumentNames[1],
                                                                   .scopeId = 0,
-                                                                  .llvmValue = context->NamedValues["stdout"],
+                                                                  .llvmValue = context->namedValue("stdout"),
                                                                   .constant = false});
         }
-        auto fileType = FileType::getFileType();
+        auto fileType = context->programUnit()->getTypeDefinitions().getType("file");
 
         if (m_argumentNames.size() >= 1)
         {
             m_blockNode->addVariableDefinition(VariableDefinition{.variableType = fileType,
                                                                   .variableName = m_argumentNames[0],
                                                                   .scopeId = 0,
-                                                                  .llvmValue = context->NamedValues["stdin"],
+                                                                  .llvmValue = context->namedValue("stdin"),
                                                                   .constant = false});
         }
 
@@ -226,7 +223,7 @@ llvm::Value *UnitNode::codegen(std::unique_ptr<Context> &context)
             m_blockNode->addVariableDefinition(VariableDefinition{.variableType = fileType,
                                                                   .variableName = m_argumentNames[2],
                                                                   .scopeId = 0,
-                                                                  .llvmValue = context->NamedValues["stderr"],
+                                                                  .llvmValue = context->namedValue("stderr"),
                                                                   .constant = false});
         }
     }
@@ -235,27 +232,16 @@ llvm::Value *UnitNode::codegen(std::unique_ptr<Context> &context)
     //  Create a new basic block to start insertion into.
     m_blockNode->codegen(context);
 
-    llvm::Function *exitCall = context->TheModule->getFunction("exit");
+    llvm::Function *exitCall = context->module()->getFunction("exit");
     std::vector<llvm::Value *> exitArgs;
-    exitArgs.push_back(llvm::ConstantInt::get(*context->TheContext, llvm::APInt(32, 0)));
+    exitArgs.push_back(llvm::ConstantInt::get(*context->context(), llvm::APInt(32, 0)));
 
-    context->Builder->CreateCall(exitCall, exitArgs);
+    context->builder()->CreateCall(exitCall, exitArgs);
 
-    context->Builder->CreateRet(llvm::ConstantInt::get(*context->TheContext, llvm::APInt(32, 0)));
-    verifyFunction(*F, &llvm::errs());
+    context->builder()->CreateRet(llvm::ConstantInt::get(*context->context(), llvm::APInt(32, 0)));
 
-    if (!llvm::verifyModule(*context->TheModule, &llvm::errs()))
-    {
-        if (context->compilerOptions.buildMode == BuildMode::Release)
-        {
-            context->TheMPM->run(*context->TheModule, *context->TheMAM);
-        }
-    }
 
-    if (context->compilerOptions.buildMode == BuildMode::Release)
-    {
-        context->TheFPM->run(*F, *context->TheFAM);
-    }
+    context->verifyModule(F);
     return nullptr;
 }
 
@@ -278,10 +264,7 @@ std::set<std::string> UnitNode::collectLibsToLink()
     }
     return result;
 }
-std::unordered_map<std::string, std::shared_ptr<VariableType>> UnitNode::getTypeDefinitions()
-{
-    return m_typeDefinitions;
-}
+TypeRegistry UnitNode::getTypeDefinitions() { return m_typeDefinitions; }
 void UnitNode::typeCheck(const std::unique_ptr<UnitNode> &unit, ASTNode *parentNode)
 {
     for (const auto &def: m_functionDefinitions)

@@ -19,23 +19,23 @@ void FieldAssignmentNode::print() {}
 llvm::Value *FieldAssignmentNode::codegen(std::unique_ptr<Context> &context)
 {
     using namespace std::string_literals;
-    llvm::AllocaInst *V = context->NamedAllocations[m_variableName];
+    llvm::AllocaInst *V = context->namedAllocation(m_variableName);
 
     const auto fieldName = m_variableName + "." + m_fieldName;
 
     if (!V)
     {
-        for (size_t i = 0; i < context->TopLevelFunction->arg_size(); ++i)
+        for (size_t i = 0; i < context->currentFunction()->arg_size(); ++i)
         {
-            auto arg = context->TopLevelFunction->getArg(static_cast<unsigned>(i));
+            auto arg = context->currentFunction()->getArg(static_cast<unsigned>(i));
             if (arg->getName() == m_variableName)
             {
                 auto functionDefinition =
-                        context->ProgramUnit->getFunctionDefinition(context->TopLevelFunction->getName().str());
+                        context->programUnit()->getFunctionDefinition(context->currentFunction()->getName().str());
                 if (!functionDefinition.has_value())
                 {
                     return LogErrorV("Cannot find function definition for " +
-                                     context->TopLevelFunction->getName().str());
+                                     context->currentFunction()->getName().str());
                 }
                 auto structDef = functionDefinition.value()->getParam(m_variableName);
 
@@ -57,24 +57,24 @@ llvm::Value *FieldAssignmentNode::codegen(std::unique_ptr<Context> &context)
                     auto bitLength = fieldType->getIntegerBitWidth();
                     if (result->getType()->isIntegerTy() && result->getType()->getIntegerBitWidth() != bitLength)
                     {
-                        result = context->Builder->CreateIntCast(result, fieldType, true, "result_cast");
+                        result = context->builder()->CreateIntCast(result, fieldType, true, "result_cast");
                     }
                 }
                 if (arg->getType()->isStructTy())
                 {
                     llvm::AllocaInst *alloca =
-                            context->Builder->CreateAlloca(llvmRecordType, nullptr, m_variableName + "_ptr");
-                    context->Builder->CreateStore(arg, alloca);
+                            context->builder()->CreateAlloca(llvmRecordType, nullptr, m_variableName + "_ptr");
+                    context->builder()->CreateStore(arg, alloca);
 
-                    auto arrayValue = context->Builder->CreateStructGEP(llvmRecordType, alloca, index, fieldName);
-                    context->Builder->CreateStore(result, arrayValue);
+                    auto arrayValue = context->builder()->CreateStructGEP(llvmRecordType, alloca, index, fieldName);
+                    context->builder()->CreateStore(result, arrayValue);
                 }
                 else
                 {
-                    auto arrayValue = context->Builder->CreateStructGEP(llvmRecordType, arg, index, fieldName);
+                    auto arrayValue = context->builder()->CreateStructGEP(llvmRecordType, arg, index, fieldName);
 
 
-                    context->Builder->CreateStore(result, arrayValue);
+                    context->builder()->CreateStore(result, arrayValue);
                 }
                 return result;
             }
@@ -85,17 +85,17 @@ llvm::Value *FieldAssignmentNode::codegen(std::unique_ptr<Context> &context)
 
 
     std::optional<VariableDefinition> structDef;
-    if (context->TopLevelFunction)
+    if (context->currentFunction())
     {
         auto functionDefinition =
-                context->ProgramUnit->getFunctionDefinition(context->TopLevelFunction->getName().str());
+                context->programUnit()->getFunctionDefinition(context->currentFunction()->getName().str());
         if (functionDefinition)
             structDef = functionDefinition.value()->body()->getVariableDefinition(m_variableName);
     }
 
     if (!structDef)
     {
-        structDef = context->ProgramUnit->getVariableDefinition(m_variableName);
+        structDef = context->programUnit()->getVariableDefinition(m_variableName);
     }
     auto recordType = std::dynamic_pointer_cast<RecordType>(structDef->variableType);
 
@@ -103,19 +103,20 @@ llvm::Value *FieldAssignmentNode::codegen(std::unique_ptr<Context> &context)
     auto field = recordType->getField(index);
 
 
-    auto elementPointer = context->Builder->CreateStructGEP(recordType->generateLlvmType(context), V, index, fieldName);
+    auto elementPointer =
+            context->builder()->CreateStructGEP(recordType->generateLlvmType(context), V, index, fieldName);
 
     auto fieldType = field.variableType->generateLlvmType(context);
     auto bitLength = fieldType->getIntegerBitWidth();
     auto result = m_expression->codegen(context);
     if (result->getType()->isIntegerTy() && result->getType()->getIntegerBitWidth() != bitLength)
     {
-        result = context->Builder->CreateIntCast(result, fieldType, true, "result_cast");
+        result = context->builder()->CreateIntCast(result, fieldType, true, "result_cast");
     }
 
-    const llvm::DataLayout &DL = context->TheModule->getDataLayout();
+    const llvm::DataLayout &DL = context->module()->getDataLayout();
     auto alignment = DL.getPrefTypeAlign(field.variableType->generateLlvmType(context));
 
-    context->Builder->CreateAlignedStore(result, elementPointer, alignment);
+    context->builder()->CreateAlignedStore(result, elementPointer, alignment);
     return result;
 }

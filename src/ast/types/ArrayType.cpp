@@ -13,11 +13,13 @@ std::shared_ptr<ArrayType> ArrayType::getFixedArray(size_t low, size_t heigh,
                                                     const std::shared_ptr<VariableType> &baseType)
 {
     auto type = std::make_shared<ArrayType>();
+    type->typeName = "array_" + baseType->typeName + "_" + std::to_string(low) + "_" + std::to_string(heigh);
     type->baseType = VariableBaseType::Array;
     type->low = low;
     type->high = heigh;
     type->arrayBase = baseType;
     type->isDynArray = false;
+    type->llvmType = nullptr;
     return type;
 }
 
@@ -25,17 +27,19 @@ std::shared_ptr<ArrayType> ArrayType::getDynArray(const std::shared_ptr<Variable
 {
     auto type = std::make_shared<ArrayType>();
     type->baseType = VariableBaseType::Array;
+    type->typeName = "dynarray_" + baseType->typeName;
     type->low = 0;
     type->high = 0;
     type->arrayBase = baseType;
     type->isDynArray = true;
+    type->llvmType = nullptr;
     return type;
 }
 
 
 llvm::Type *IntegerType::generateLlvmType(std::unique_ptr<Context> &context)
 {
-    return llvm::IntegerType::get(*context->TheContext, this->length);
+    return llvm::IntegerType::get(*context->context(), this->length);
 }
 
 
@@ -56,14 +60,14 @@ llvm::Type *ArrayType::generateLlvmType(std::unique_ptr<Context> &context)
             llvm::ArrayRef<llvm::Type *> Elements(types);
 
 
-            llvmType = llvm::StructType::create(Elements);
+            llvmType = llvm::StructType::create(*context->context(), Elements, arrayBase->typeName);
         }
         else
         {
 
             const auto arraySize = high - low + 1;
 
-            llvmType = llvm::ArrayType::get(arrayBaseType, arraySize);
+            return llvm::ArrayType::get(arrayBaseType, arraySize);
         }
     }
     return llvmType;
@@ -72,19 +76,7 @@ llvm::Type *ArrayType::generateLlvmType(std::unique_ptr<Context> &context)
 llvm::Value *ArrayType::generateFieldAccess(Token &token, llvm::Value *indexValue, std::unique_ptr<Context> &context)
 {
     const auto arrayName = std::string(token.lexical());
-    llvm::Value *arrayAllocation = context->NamedAllocations[arrayName];
-
-    if (!arrayAllocation)
-    {
-        for (auto &arg: context->TopLevelFunction->args())
-        {
-            if (arg.getName() == arrayName)
-            {
-                arrayAllocation = context->TopLevelFunction->getArg(arg.getArgNo());
-                break;
-            }
-        }
-    }
+    const auto arrayAllocation = context->findValue(arrayName);
 
 
     if (!arrayAllocation)
@@ -96,17 +88,17 @@ llvm::Value *ArrayType::generateFieldAccess(Token &token, llvm::Value *indexValu
         const auto arrayBaseType = this->arrayBase->generateLlvmType(context);
 
         const auto arrayPointerOffset =
-                context->Builder->CreateStructGEP(llvmRecordType, arrayAllocation, 1, "array.ptr.offset");
-        // const llvm::DataLayout &DL = context->TheModule->getDataLayout();
+                context->builder()->CreateStructGEP(llvmRecordType, arrayAllocation.value(), 1, "array.ptr.offset");
+        // const llvm::DataLayout &DL = context->module()->getDataLayout();
         // auto alignment = DL.getPrefTypeAlign(ptrType);
         const auto loadResult =
-                context->Builder->CreateLoad(llvm::PointerType::getUnqual(*context->TheContext), arrayPointerOffset);
+                context->builder()->CreateLoad(llvm::PointerType::getUnqual(*context->context()), arrayPointerOffset);
 
 
-        const auto bounds = context->Builder->CreateGEP(arrayBaseType, loadResult,
-                                                        llvm::ArrayRef<llvm::Value *>{indexValue}, "", true);
+        const auto bounds = context->builder()->CreateGEP(arrayBaseType, loadResult,
+                                                          llvm::ArrayRef<llvm::Value *>{indexValue}, "", true);
 
-        return context->Builder->CreateLoad(arrayBaseType, bounds);
+        return context->builder()->CreateLoad(arrayBaseType, bounds);
     }
 
     if (llvm::isa<llvm::ConstantInt>(indexValue))
@@ -122,62 +114,49 @@ llvm::Value *ArrayType::generateFieldAccess(Token &token, llvm::Value *indexValu
     }
     llvm::Value *index = indexValue;
     if (this->low > 0)
-        index = context->Builder->CreateSub(
-                index, context->Builder->getIntN(index->getType()->getIntegerBitWidth(), this->low), "array.index.sub");
+        index = context->builder()->CreateSub(
+                index, context->builder()->getIntN(index->getType()->getIntegerBitWidth(), this->low),
+                "array.index.sub");
 
     const auto arrayType = this->generateLlvmType(context);
-    const auto arrayValue = context->Builder->CreateGEP(arrayType, arrayAllocation,
-                                                        {context->Builder->getInt64(0), index}, "arrayindex", false);
-    return context->Builder->CreateLoad(arrayType->getArrayElementType(), arrayValue);
+    const auto arrayValue = context->builder()->CreateGEP(
+            arrayType, arrayAllocation.value(), {context->builder()->getInt64(0), index}, "arrayindex", false);
+    return context->builder()->CreateLoad(arrayType->getArrayElementType(), arrayValue);
 }
 llvm::Value *ArrayType::generateLengthValue(const Token &token, std::unique_ptr<Context> &context)
 {
     const auto arrayName = std::string(token.lexical());
-    llvm::Value *value = context->NamedAllocations[arrayName];
-
-    if (!value)
-    {
-        for (auto &arg: context->TopLevelFunction->args())
-        {
-            if (arg.getName() == arrayName)
-            {
-                value = context->TopLevelFunction->getArg(arg.getArgNo());
-                break;
-            }
-        }
-    }
-
-
+    const auto value = context->findValue(arrayName);
     if (!value)
         return LogErrorV("Unknown variable for array access: " + arrayName);
-
 
     if (isDynArray)
     {
         const auto llvmRecordType = generateLlvmType(context);
 
-        const auto arraySizeOffset = context->Builder->CreateStructGEP(llvmRecordType, value, 0, "array.size.offset");
+        const auto arraySizeOffset =
+                context->builder()->CreateStructGEP(llvmRecordType, value.value(), 0, "array.size.offset");
         const auto indexType = VariableType::getInteger(64)->generateLlvmType(context);
 
-        return context->Builder->CreateLoad(indexType, arraySizeOffset);
+        return context->builder()->CreateLoad(indexType, arraySizeOffset);
     }
-    return context->Builder->getInt64(high - low);
+    return context->builder()->getInt64(high - low);
 }
 llvm::Value *ArrayType::getLowValue(std::unique_ptr<Context> &context)
 {
     if (isDynArray)
     {
-        return context->Builder->getInt64(0);
+        return context->builder()->getInt64(0);
     }
-    return context->Builder->getInt64(low);
+    return context->builder()->getInt64(low);
 }
 llvm::Value *ArrayType::generateHighValue(const Token &token, std::unique_ptr<Context> &context)
 {
     if (isDynArray)
     {
-        return context->Builder->CreateSub(generateLengthValue(token, context), context->Builder->getInt64(1));
+        return context->builder()->CreateSub(generateLengthValue(token, context), context->builder()->getInt64(1));
     }
-    return context->Builder->getInt64(high);
+    return context->builder()->getInt64(high);
 }
 llvm::Value *ArrayType::generateLowerBounds(const Token &token, std::unique_ptr<Context> &context)
 {

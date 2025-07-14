@@ -10,23 +10,23 @@ llvm::Value *codegen::codegen_ifexpr(std::unique_ptr<Context> &context, llvm::Va
     llvm::Value *CondV = condition;
     if (!CondV)
         return nullptr;
-    CondV = context->Builder->CreateICmpEQ(CondV, context->Builder->getTrue(), "ifcond");
+    CondV = context->builder()->CreateICmpEQ(CondV, context->builder()->getTrue(), "ifcond");
 
-    llvm::Function *TheFunction = context->Builder->GetInsertBlock()->getParent();
-    llvm::BasicBlock *ThenBB = llvm::BasicBlock::Create(*context->TheContext, "then", TheFunction);
-    llvm::BasicBlock *MergeBB = llvm::BasicBlock::Create(*context->TheContext, "ifcont");
+    llvm::Function *TheFunction = context->builder()->GetInsertBlock()->getParent();
+    llvm::BasicBlock *ThenBB = llvm::BasicBlock::Create(*context->context(), "then", TheFunction);
+    llvm::BasicBlock *MergeBB = llvm::BasicBlock::Create(*context->context(), "ifcont");
 
-    context->Builder->CreateCondBr(CondV, ThenBB, MergeBB);
+    context->builder()->CreateCondBr(CondV, ThenBB, MergeBB);
 
-    context->Builder->SetInsertPoint(ThenBB);
+    context->builder()->SetInsertPoint(ThenBB);
 
     body(context);
 
-    if (!context->BreakBlock.BlockUsed)
-        context->Builder->CreateBr(MergeBB);
-    context->BreakBlock.BlockUsed = false;
+    if (!context->breakBlock().BlockUsed)
+        context->builder()->CreateBr(MergeBB);
+    context->breakBlock().BlockUsed = false;
     TheFunction->insert(TheFunction->end(), MergeBB);
-    context->Builder->SetInsertPoint(MergeBB);
+    context->builder()->SetInsertPoint(MergeBB);
 
     return CondV;
 }
@@ -39,40 +39,40 @@ llvm::Value *codegen::codegen_ifelseexpr(std::unique_ptr<Context> &context, llvm
         return nullptr;
 
     // Convert condition to a bool by comparing non-equal to 0.0.
-    condition = context->Builder->CreateICmpEQ(condition, context->Builder->getTrue(), "ifcond");
-    llvm::Function *TheFunction = context->Builder->GetInsertBlock()->getParent();
+    condition = context->builder()->CreateICmpEQ(condition, context->builder()->getTrue(), "ifcond");
+    llvm::Function *TheFunction = context->builder()->GetInsertBlock()->getParent();
 
     // Create blocks for the then and else cases.  Insert the 'then' block at the
     // end of the function.
-    llvm::BasicBlock *ThenBB = llvm::BasicBlock::Create(*context->TheContext, "then", TheFunction);
-    llvm::BasicBlock *ElseBB = llvm::BasicBlock::Create(*context->TheContext, "else");
-    llvm::BasicBlock *MergeBB = llvm::BasicBlock::Create(*context->TheContext, "ifcont");
-    context->Builder->CreateCondBr(condition, ThenBB, ElseBB);
+    llvm::BasicBlock *ThenBB = llvm::BasicBlock::Create(*context->context(), "then", TheFunction);
+    llvm::BasicBlock *ElseBB = llvm::BasicBlock::Create(*context->context(), "else");
+    llvm::BasicBlock *MergeBB = llvm::BasicBlock::Create(*context->context(), "ifcont");
+    context->builder()->CreateCondBr(condition, ThenBB, ElseBB);
 
     // Emit then value.
-    context->Builder->SetInsertPoint(ThenBB);
+    context->builder()->SetInsertPoint(ThenBB);
 
     ifExpressions(context);
-    if (!context->BreakBlock.BlockUsed)
-        context->Builder->CreateBr(MergeBB);
+    if (!context->breakBlock().BlockUsed)
+        context->builder()->CreateBr(MergeBB);
     // Codegen of 'Then' can change the current block, update ThenBB for the PHI.
-    ThenBB = context->Builder->GetInsertBlock();
+    ThenBB = context->builder()->GetInsertBlock();
 
     // Emit else block.
     TheFunction->insert(TheFunction->end(), ElseBB);
-    context->Builder->SetInsertPoint(ElseBB);
+    context->builder()->SetInsertPoint(ElseBB);
 
     elseExpressions(context);
-    if (!context->BreakBlock.BlockUsed)
-        context->Builder->CreateBr(MergeBB);
+    if (!context->breakBlock().BlockUsed)
+        context->builder()->CreateBr(MergeBB);
     // Codegen of 'Else' can change the current block, update ElseBB for the PHI.
-    ElseBB = context->Builder->GetInsertBlock();
+    ElseBB = context->builder()->GetInsertBlock();
 
     // Emit merge block.
     TheFunction->insert(TheFunction->end(), MergeBB);
-    context->Builder->SetInsertPoint(MergeBB);
+    context->builder()->SetInsertPoint(MergeBB);
     // llvm::PHINode *PN =
-    //     context->Builder->CreatePHI(llvm::Type::getInt64Ty(*context->TheContext), 2, "iftmp");
+    //     context->builder()->CreatePHI(llvm::Type::getInt64Ty(*context->context()), 2, "iftmp");
 
     // PN->addIncoming(ThenV, ThenBB);
     // PN->addIncoming(ElseV, ElseBB);
@@ -83,18 +83,18 @@ llvm::Value *codegen::codegen_ifelseexpr(std::unique_ptr<Context> &context, llvm
 llvm::Value *codegen::codegen_while(std::unique_ptr<Context> &context, llvm::Value *condition,
                                     std::function<void(std::unique_ptr<Context> &)> body)
 {
-    llvm::BasicBlock *LoopBB = llvm::BasicBlock::Create(*context->TheContext, "loop", context->TopLevelFunction);
+    llvm::BasicBlock *LoopBB = llvm::BasicBlock::Create(*context->context(), "loop", context->currentFunction());
     llvm::BasicBlock *LoopCondBB =
-            llvm::BasicBlock::Create(*context->TheContext, "loop.cond", context->TopLevelFunction);
+            llvm::BasicBlock::Create(*context->context(), "loop.cond", context->currentFunction());
 
-    llvm::BasicBlock *AfterBB = llvm::BasicBlock::Create(*context->TheContext, "afterloop", context->TopLevelFunction);
+    llvm::BasicBlock *AfterBB = llvm::BasicBlock::Create(*context->context(), "afterloop", context->currentFunction());
 
     // Insert an explicit fall through from the current block to the LoopBB.
-    context->Builder->CreateBr(LoopCondBB);
-    context->Builder->SetInsertPoint(LoopCondBB);
+    context->builder()->CreateBr(LoopCondBB);
+    context->builder()->SetInsertPoint(LoopCondBB);
     // // Convert condition to a bool by comparing non-equal to 0.0.
-    // EndCond = context->Builder->CreateICmpEQ(
-    //     EndCond, llvm::ConstantInt::get(*context->TheContext, llvm::APInt(64, 0)), "loopcond");
+    // EndCond = context->builder()->CreateICmpEQ(
+    //     EndCond, llvm::ConstantInt::get(*context->context(), llvm::APInt(64, 0)), "loopcond");
     // Create the "after loop" block and insert it.
     // Compute the end condition.
     llvm::Value *EndCond = condition;
@@ -103,28 +103,28 @@ llvm::Value *codegen::codegen_while(std::unique_ptr<Context> &context, llvm::Val
 
 
     // Insert the conditional branch into the end of LoopEndBB.
-    context->Builder->CreateCondBr(EndCond, LoopBB, AfterBB);
+    context->builder()->CreateCondBr(EndCond, LoopBB, AfterBB);
 
 
     // Start insertion in LoopBB.
-    context->Builder->SetInsertPoint(LoopBB);
+    context->builder()->SetInsertPoint(LoopBB);
 
     // Emit the body of the loop.  This, like any other expr, can change the
     // current BB.  Note that we ignore the value computed by the body, but don't
     // allow an error.
-    auto lastBreakBlock = context->BreakBlock.Block;
-    context->BreakBlock.Block = AfterBB;
-    context->BreakBlock.BlockUsed = false;
+    auto lastBreakBlock = context->breakBlock().Block;
+    context->breakBlock().Block = AfterBB;
+    context->breakBlock().BlockUsed = false;
 
-    context->Builder->SetInsertPoint(LoopBB);
+    context->builder()->SetInsertPoint(LoopBB);
     body(context);
-    context->Builder->CreateBr(LoopCondBB);
+    context->builder()->CreateBr(LoopCondBB);
 
-    context->BreakBlock.Block = lastBreakBlock;
+    context->breakBlock().Block = lastBreakBlock;
 
     // Any new code will be inserted in AfterBB.
-    context->Builder->SetInsertPoint(AfterBB);
+    context->builder()->SetInsertPoint(AfterBB);
 
     // for expr always returns 0.0.
-    return llvm::Constant::getNullValue(llvm::Type::getInt64Ty(*context->TheContext));
+    return llvm::Constant::getNullValue(llvm::Type::getInt64Ty(*context->context()));
 }

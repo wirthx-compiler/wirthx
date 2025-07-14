@@ -10,7 +10,6 @@ class RecordType : public VariableType
 {
 private:
     std::vector<VariableDefinition> m_fields;
-    llvm::Type *m_cachedType = nullptr;
 
 public:
     VariableDefinition getField(size_t index);

@@ -14,7 +14,7 @@ ForEachNode::ForEachNode(const Token &token, const Token &loopVariable, const st
 void ForEachNode::print() {}
 llvm::Value *ForEachNode::codegen(std::unique_ptr<Context> &context)
 {
-    const auto loopExpressionType = m_loopExpression->resolveType(context->ProgramUnit, resolveParent(context));
+    const auto loopExpressionType = m_loopExpression->resolveType(context->programUnit(), resolveParent(context));
     const auto rangeType = std::dynamic_pointer_cast<RangeType>(loopExpressionType);
     if (!rangeType)
     {
@@ -27,8 +27,8 @@ llvm::Value *ForEachNode::codegen(std::unique_ptr<Context> &context)
     if (!startValue)
         return nullptr;
 
-    const auto &builder = context->Builder;
-    const auto &llvmContext = context->TheContext;
+    const auto &builder = context->builder();
+    const auto &llvmContext = context->context();
 
 
     llvm::Function *TheFunction = builder->GetInsertBlock()->getParent();
@@ -52,17 +52,17 @@ llvm::Value *ForEachNode::codegen(std::unique_ptr<Context> &context)
 
     if (startValue->getType()->getIntegerBitWidth() != bitLength)
     {
-        startValue = context->Builder->CreateIntCast(startValue, targetType, true, "startValue_cast");
+        startValue = context->builder()->CreateIntCast(startValue, targetType, true, "startValue_cast");
     }
     Variable->addIncoming(startValue, preheaderBB);
 
     // context->NamedValues[m_loopVariable] = Variable;
     Token expressionToken = m_loopExpression->expressionToken();
-    const auto loopVariableAllocation = context->NamedAllocations[m_loopVariable.lexical()];
+    const auto loopVariableAllocation = context->namedAllocation(m_loopVariable.lexical());
     llvm::Value *value = rangeType->generateFieldAccess(expressionToken, Variable, context);
-    context->Builder->CreateStore(value, loopVariableAllocation);
-    context->BreakBlock.Block = afterBB;
-    context->BreakBlock.BlockUsed = false;
+    context->builder()->CreateStore(value, loopVariableAllocation);
+    context->breakBlock().Block = afterBB;
+    context->breakBlock().BlockUsed = false;
 
     // Emit the body of the loop.  This, like any other expr, can change the
     // current BB.  Note that we ignore the value computed by the body, but don't
@@ -72,7 +72,7 @@ llvm::Value *ForEachNode::codegen(std::unique_ptr<Context> &context)
         builder->SetInsertPoint(loopBB);
         exp->codegen(context);
     }
-    context->BreakBlock.Block = nullptr;
+    context->breakBlock().Block = nullptr;
     // Emit the step value.
     llvm::Value *stepValue = builder->getIntN(bitLength, 1);
 
@@ -84,11 +84,11 @@ llvm::Value *ForEachNode::codegen(std::unique_ptr<Context> &context)
         return nullptr;
     if (EndCond->getType()->getIntegerBitWidth() != bitLength)
     {
-        EndCond = context->Builder->CreateIntCast(EndCond, targetType, true, "lhs_cast");
+        EndCond = context->builder()->CreateIntCast(EndCond, targetType, true, "lhs_cast");
     }
 
     // Convert condition to a bool by comparing non-equal to 0.0.
-    EndCond = context->Builder->CreateCmp(llvm::CmpInst::ICMP_SLE, nextVar, EndCond, "for.loopcond");
+    EndCond = context->builder()->CreateCmp(llvm::CmpInst::ICMP_SLE, nextVar, EndCond, "for.loopcond");
 
 
     // Create the "after loop" block and insert it.

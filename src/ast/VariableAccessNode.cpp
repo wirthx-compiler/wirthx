@@ -17,36 +17,36 @@ void VariableAccessNode::print() { std::cout << m_variableName; }
 llvm::Value *VariableAccessNode::codegen(std::unique_ptr<Context> &context)
 {
     const auto variableName = to_lower(m_variableName);
-    llvm::Value *V = context->NamedValues[m_variableName];
+    llvm::Value *V = context->namedValue(m_variableName);
     if (V)
     {
         return V;
     }
 
-    llvm::AllocaInst *A = context->NamedAllocations[m_variableName];
+    llvm::AllocaInst *A = context->namedAllocation(m_variableName);
 
     if (!A)
     {
-        for (auto &arg: context->TopLevelFunction->args())
+        for (auto &arg: context->currentFunction()->args())
         {
             if (iequals(arg.getName(), variableName))
             {
                 auto functionDefinition =
-                        context->ProgramUnit->getFunctionDefinition(context->TopLevelFunction->getName().str());
+                        context->programUnit()->getFunctionDefinition(context->currentFunction()->getName().str());
 
                 const auto argType = functionDefinition.value()->getParam(arg.getArgNo());
                 const auto llvmArgType = argType->type->generateLlvmType(context);
-                auto argValue = context->TopLevelFunction->getArg(arg.getArgNo());
+                auto argValue = context->currentFunction()->getArg(arg.getArgNo());
                 if (argType->type->baseType == VariableBaseType::Struct)
                 {
                     llvm::AllocaInst *alloca =
-                            context->Builder->CreateAlloca(llvmArgType, nullptr, argType->argumentName + "_struct");
-                    return context->Builder->CreateLoad(A->getAllocatedType(), alloca, m_variableName.c_str());
+                            context->builder()->CreateAlloca(llvmArgType, nullptr, argType->argumentName + "_struct");
+                    return context->builder()->CreateLoad(A->getAllocatedType(), alloca, m_variableName.c_str());
                 }
                 if (argType->isReference && (argType->type->isSimpleType()))
                 {
 
-                    return context->Builder->CreateLoad(llvmArgType, argValue);
+                    return context->builder()->CreateLoad(llvmArgType, argValue);
                 }
 
                 return argValue;
@@ -57,7 +57,7 @@ llvm::Value *VariableAccessNode::codegen(std::unique_ptr<Context> &context)
         return LogErrorV("Unknown variable name: " + m_variableName);
     }
 
-    // auto type = resolveType(context->ProgramUnit, resolveParent(context));
+    // auto type = resolveType(context->programUnit(), resolveParent(context));
     // if (!m_dereference && type->baseType == VariableBaseType::Pointer)
     // {
     //     return A;
@@ -68,7 +68,7 @@ llvm::Value *VariableAccessNode::codegen(std::unique_ptr<Context> &context)
         return A;
 
 
-    return context->Builder->CreateLoad(A->getAllocatedType(), A, m_variableName.c_str());
+    return context->builder()->CreateLoad(A->getAllocatedType(), A, m_variableName.c_str());
 }
 
 std::shared_ptr<VariableType> VariableAccessNode::resolveType(const std::unique_ptr<UnitNode> &unit, ASTNode *parent)

@@ -50,21 +50,22 @@ Parser::Parser(const std::vector<std::filesystem::path> &rtlDirectories, std::fi
                const std::unordered_map<std::string, bool> &definitions, const std::vector<Token> &tokens) :
     m_rtlDirectories(rtlDirectories), m_file_path(std::move(path)), m_tokens(tokens), m_definitions(definitions)
 {
-    m_typeDefinitions["shortint"] = VariableType::getInteger(8);
-    m_typeDefinitions["byte"] = VariableType::getInteger(8);
-    m_typeDefinitions["char"] = VariableType::getCharacter();
-    m_typeDefinitions["smallint"] = VariableType::getInteger(16);
-    m_typeDefinitions["word"] = VariableType::getInteger(16);
-    m_typeDefinitions["longint"] = VariableType::getInteger();
-    m_typeDefinitions["integer"] = VariableType::getInteger();
-    m_typeDefinitions["int64"] = VariableType::getInteger(64);
-    m_typeDefinitions["string"] = StringType::getString();
-    m_typeDefinitions["boolean"] = VariableType::getBoolean();
-    m_typeDefinitions["pointer"] = PointerType::getUnqual();
-    m_typeDefinitions["pinteger"] = PointerType::getPointerTo(VariableType::getInteger());
-    m_typeDefinitions["double"] = VariableType::getDouble();
-    m_typeDefinitions["real"] = VariableType::getDouble();
-    m_typeDefinitions["single"] = VariableType::getSingle();
+    m_typeDefinitions.registerType("shortint", VariableType::getInteger(8));
+    m_typeDefinitions.registerType("byte", VariableType::getInteger(8));
+    m_typeDefinitions.registerType("char", VariableType::getCharacter());
+    m_typeDefinitions.registerType("smallint", VariableType::getInteger(16));
+    m_typeDefinitions.registerType("word", VariableType::getInteger(16));
+    m_typeDefinitions.registerType("longint", VariableType::getInteger());
+    m_typeDefinitions.registerType("integer", VariableType::getInteger());
+    m_typeDefinitions.registerType("int64", VariableType::getInteger(64));
+    m_typeDefinitions.registerType("string", StringType::getString());
+    m_typeDefinitions.registerType("boolean", VariableType::getBoolean());
+    m_typeDefinitions.registerType("pointer", PointerType::getUnqual());
+    m_typeDefinitions.registerType("pinteger", PointerType::getPointerTo(VariableType::getInteger()));
+    m_typeDefinitions.registerType("double", VariableType::getDouble());
+    m_typeDefinitions.registerType("real", VariableType::getDouble());
+    m_typeDefinitions.registerType("single", VariableType::getSingle());
+    m_typeDefinitions.registerType("file", FileType::getFileType());
 }
 bool Parser::hasError() const
 {
@@ -338,7 +339,7 @@ void Parser::parseTypeDefinitions(const size_t scope)
         consume(TokenType::EQUAL);
         if (const auto type = parseVariableType(scope, true, typeName); type.has_value())
         {
-            m_typeDefinitions[typeName] = type.value();
+            m_typeDefinitions.registerType(typeName, type.value());
             consume(TokenType::SEMICOLON);
         }
     }
@@ -505,7 +506,7 @@ std::vector<VariableDefinition> Parser::parseVariableDefinitions(const size_t sc
         {
             consumeKeyWord("file");
             varType = std::string(_currentToken.lexical());
-            type = FileType::getFileType();
+            type = m_typeDefinitions.getType("file");
         }
         else if (tryConsumeKeyWord("array"))
         {
@@ -1139,7 +1140,7 @@ std::shared_ptr<FunctionDefinitionNode> Parser::parseFunctionDeclaration(size_t 
         else if (canConsumeKeyWord("file"))
         {
             consumeKeyWord("file");
-            std::shared_ptr<VariableType> variableType = FileType::getFileType();
+            std::shared_ptr<VariableType> variableType = m_typeDefinitions.getType("file");
             for (const auto &param: paramNames)
             {
                 functionParams.push_back(FunctionArgument{.type = variableType,
@@ -1764,9 +1765,9 @@ bool Parser::importUnit(const Token &token, const std::string &filename, bool in
     }
     for (auto &[typeName, newType]: unitCache[path.string()]->getTypeDefinitions())
     {
-        if (!m_typeDefinitions.contains(typeName))
+        if (!m_typeDefinitions.hasType(typeName))
         {
-            m_typeDefinitions[typeName] = newType;
+            m_typeDefinitions.registerType(typeName, newType);
         }
     }
 
@@ -1948,10 +1949,10 @@ std::unique_ptr<UnitNode> Parser::parseUnit(bool includeSystem)
             throw ParserException(m_errors);
         }
 
-        for (auto declaration: m_functionDeclarations)
+        for (const auto &declaration: m_functionDeclarations)
         {
             bool found = false;
-            for (auto def: m_functionDefinitions)
+            for (const auto &def: m_functionDefinitions)
             {
                 if (def->functionSignature() == declaration->functionSignature())
                 {
@@ -1980,7 +1981,7 @@ std::unique_ptr<UnitNode> Parser::parseProgram()
 {
     try
     {
-        UnitType unitType = UnitType::PROGRAM;
+        auto unitType = UnitType::PROGRAM;
 
 
         consume(TokenType::NAMEDTOKEN);
@@ -1995,10 +1996,11 @@ std::unique_ptr<UnitNode> Parser::parseProgram()
                 consume(TokenType::NAMEDTOKEN);
                 auto paramName = current().lexical();
                 paramNames.emplace_back(paramName);
-                m_known_variable_definitions.push_back(VariableDefinition{.variableType = FileType::getFileType(),
-                                                                          .variableName = paramName,
-                                                                          .token = current(),
-                                                                          .scopeId = 0});
+                m_known_variable_definitions.push_back(
+                        VariableDefinition{.variableType = m_typeDefinitions.getType("file"),
+                                           .variableName = paramName,
+                                           .token = current(),
+                                           .scopeId = 0});
                 tryConsume(TokenType::COMMA);
             }
             consume(TokenType::RIGHT_CURLY);

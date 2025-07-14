@@ -9,8 +9,8 @@ void BreakNode::print() {}
 
 llvm::Value *BreakNode::codegen(std::unique_ptr<Context> &context)
 {
-    assert(context->BreakBlock.Block != nullptr && "no break block defined");
-    context->Builder->CreateBr(context->BreakBlock.Block);
-    context->BreakBlock.BlockUsed = true;
+    assert(context->breakBlock().Block != nullptr && "no break block defined");
+    context->builder()->CreateBr(context->breakBlock().Block);
+    context->breakBlock().BlockUsed = true;
     return nullptr;
 }

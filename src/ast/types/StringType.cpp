@@ -8,10 +8,9 @@
 
 llvm::Type *StringType::generateLlvmType(std::unique_ptr<Context> &context)
 {
-    if (llvmType != nullptr && llvmType->getContext().pImpl != context->TheContext->pImpl)
-    {
-        llvmType = nullptr;
-    }
+
+    const auto llvmType = llvm::StructType::getTypeByName(*context->context(), "string");
+
 
     if (llvmType == nullptr)
     {
@@ -26,7 +25,7 @@ llvm::Type *StringType::generateLlvmType(std::unique_ptr<Context> &context)
         llvm::ArrayRef<llvm::Type *> Elements(types);
 
 
-        llvmType = llvm::StructType::create(Elements, "string");
+        return llvm::StructType::create(*context->context(), Elements, "string");
     }
     return llvmType;
 }
@@ -34,19 +33,7 @@ llvm::Type *StringType::generateLlvmType(std::unique_ptr<Context> &context)
 llvm::Value *StringType::generateFieldAccess(Token &token, llvm::Value *indexValue, std::unique_ptr<Context> &context)
 {
     const auto arrayName = token.lexical();
-    llvm::Value *V = context->NamedAllocations[arrayName];
-
-    if (!V)
-    {
-        for (auto &arg: context->TopLevelFunction->args())
-        {
-            if (arg.getName() == arrayName)
-            {
-                V = context->TopLevelFunction->getArg(arg.getArgNo());
-                break;
-            }
-        }
-    }
+    const auto V = context->findValue(arrayName);
 
     if (!V)
         return LogErrorV("Unknown variable for string access: " + arrayName);
@@ -55,16 +42,17 @@ llvm::Value *StringType::generateFieldAccess(Token &token, llvm::Value *indexVal
     const auto llvmRecordType = this->generateLlvmType(context);
     const auto arrayBaseType = IntegerType::getInteger(8)->generateLlvmType(context);
 
-    const auto arrayPointerOffset = context->Builder->CreateStructGEP(llvmRecordType, V, 2, "string.ptr.offset");
+    const auto arrayPointerOffset =
+            context->builder()->CreateStructGEP(llvmRecordType, V.value(), 2, "string.ptr.offset");
 
     const auto loadResult =
-            context->Builder->CreateLoad(llvm::PointerType::getUnqual(*context->TheContext), arrayPointerOffset);
+            context->builder()->CreateLoad(llvm::PointerType::getUnqual(*context->context()), arrayPointerOffset);
 
 
-    const auto bounds =
-            context->Builder->CreateGEP(arrayBaseType, loadResult, llvm::ArrayRef<llvm::Value *>{indexValue}, "", true);
+    const auto bounds = context->builder()->CreateGEP(arrayBaseType, loadResult,
+                                                      llvm::ArrayRef<llvm::Value *>{indexValue}, "", true);
 
-    return context->Builder->CreateLoad(arrayBaseType, bounds);
+    return context->builder()->CreateLoad(arrayBaseType, bounds);
 }
 
 std::shared_ptr<StringType> StringType::getString()
@@ -77,19 +65,7 @@ std::shared_ptr<StringType> StringType::getString()
 llvm::Value *StringType::generateLengthValue(const Token &token, std::unique_ptr<Context> &context)
 {
     const auto arrayName = token.lexical();
-    llvm::Value *value = context->NamedAllocations[arrayName];
-
-    if (!value)
-    {
-        for (auto &arg: context->TopLevelFunction->args())
-        {
-            if (arg.getName() == arrayName)
-            {
-                value = context->TopLevelFunction->getArg(arg.getArgNo());
-                break;
-            }
-        }
-    }
+    const auto value = context->findValue(arrayName);
 
     if (!value)
         return LogErrorV("Unknown variable for string access: " + arrayName);
@@ -97,19 +73,19 @@ llvm::Value *StringType::generateLengthValue(const Token &token, std::unique_ptr
 
     const auto llvmRecordType = generateLlvmType(context);
 
-    const auto arraySizeOffset = context->Builder->CreateStructGEP(llvmRecordType, value, 1, "length");
+    const auto arraySizeOffset = context->builder()->CreateStructGEP(llvmRecordType, value.value(), 1, "length");
     const auto indexType = VariableType::getInteger(64)->generateLlvmType(context);
 
-    return context->Builder->CreateSub(context->Builder->CreateLoad(indexType, arraySizeOffset, "loaded.length"),
-                                       context->Builder->getInt64(1));
+    return context->builder()->CreateSub(context->builder()->CreateLoad(indexType, arraySizeOffset, "loaded.length"),
+                                         context->builder()->getInt64(1));
 }
 llvm::Value *StringType::generateHighValue(const Token &token, std::unique_ptr<Context> &context)
 {
-    return context->Builder->CreateSub(generateLengthValue(token, context), context->Builder->getInt64(1));
+    return context->builder()->CreateSub(generateLengthValue(token, context), context->builder()->getInt64(1));
 }
 llvm::Value *StringType::generateLowerBounds(const Token &token, std::unique_ptr<Context> &context)
 {
-    return context->Builder->getInt64(0);
+    return context->builder()->getInt64(0);
 }
 llvm::Value *StringType::generateUpperBounds(const Token &token, std::unique_ptr<Context> &context)
 {

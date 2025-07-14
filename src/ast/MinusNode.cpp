@@ -16,7 +16,7 @@ void MinusNode::print() {}
 
 llvm::Value *MinusNode::codegen(std::unique_ptr<Context> &context)
 {
-    const auto type = m_node->resolveType(context->ProgramUnit, resolveParent(context));
+    const auto type = m_node->resolveType(context->programUnit(), resolveParent(context));
 
     switch (type->baseType)
     {
@@ -25,14 +25,14 @@ llvm::Value *MinusNode::codegen(std::unique_ptr<Context> &context)
         {
             if (const auto intNode = std::dynamic_pointer_cast<NumberNode>(m_node))
             {
-                return llvm::ConstantInt::get(*context->TheContext, llvm::APInt(64, -intNode->getValue()));
+                return llvm::ConstantInt::get(*context->context(), llvm::APInt(64, -intNode->getValue()));
             }
         }
         case VariableBaseType::Double:
         case VariableBaseType::Float:
             if (const auto doubleNode = std::dynamic_pointer_cast<DoubleNode>(m_node))
             {
-                return llvm::ConstantFP::get(context->Builder->getDoubleTy(), -doubleNode->getValue());
+                return llvm::ConstantFP::get(context->builder()->getDoubleTy(), -doubleNode->getValue());
             }
             break;
         default:

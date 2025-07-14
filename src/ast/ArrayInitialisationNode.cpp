@@ -14,8 +14,8 @@ void ArrayInitialisationNode::print() {}
 llvm::Value *ArrayInitialisationNode::codegen(std::unique_ptr<Context> &context)
 {
 
-    auto valueType =
-            m_arguments[0]->resolveType(context->ProgramUnit, resolveParent(context))->generateLlvmType(context);
+    const auto valueType =
+            m_arguments[0]->resolveType(context->programUnit(), resolveParent(context))->generateLlvmType(context);
     llvm::ArrayType *ArrayTy = llvm::ArrayType::get(valueType, m_arguments.size());
 
     // Define the array content

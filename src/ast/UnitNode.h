@@ -5,6 +5,7 @@
 #include "ASTNode.h"
 #include "ast/BlockNode.h"
 #include "ast/FunctionDefinitionNode.h"
+#include "types/TypeRegistry.h"
 
 enum class UnitType
 {
@@ -18,20 +19,18 @@ private:
     UnitType m_unitType;
     std::string m_unitName;
     std::vector<std::shared_ptr<FunctionDefinitionNode>> m_functionDefinitions;
-    std::unordered_map<std::string, std::shared_ptr<VariableType>> m_typeDefinitions;
+    TypeRegistry m_typeDefinitions;
     std::shared_ptr<BlockNode> m_blockNode;
     std::vector<std::string> m_argumentNames;
 
 public:
     UnitNode(const Token &token, UnitType unitType, const std::string &unitName,
              const std::vector<std::shared_ptr<FunctionDefinitionNode>> &functionDefinitions,
-             const std::unordered_map<std::string, std::shared_ptr<VariableType>> &typeDefinitions,
-             const std::shared_ptr<BlockNode> &blockNode);
+             const TypeRegistry &typeDefinitions, const std::shared_ptr<BlockNode> &blockNode);
     UnitNode(const Token &token, UnitType unitType, const std::string &unitName,
              const std::vector<std::string> &argumentNames,
              const std::vector<std::shared_ptr<FunctionDefinitionNode>> &functionDefinitions,
-             const std::unordered_map<std::string, std::shared_ptr<VariableType>> &typeDefinitions,
-             const std::shared_ptr<BlockNode> &blockNode);
+             const TypeRegistry &typeDefinitions, const std::shared_ptr<BlockNode> &blockNode);
     ~UnitNode() override = default;
 
     void print() override;
@@ -44,7 +43,7 @@ public:
     llvm::Value *codegen(std::unique_ptr<Context> &context) override;
     std::optional<VariableDefinition> getVariableDefinition(const std::string &name) const;
     std::set<std::string> collectLibsToLink();
-    std::unordered_map<std::string, std::shared_ptr<VariableType>> getTypeDefinitions();
+    TypeRegistry getTypeDefinitions();
 
     void typeCheck(const std::unique_ptr<UnitNode> &unit, ASTNode *parentNode) override;
     std::optional<std::pair<const ASTNode *, std::shared_ptr<ASTNode>>> getNodeByToken(const Token &token) const;

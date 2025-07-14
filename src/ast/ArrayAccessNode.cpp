@@ -83,27 +83,13 @@ Token ArrayAccessNode::expressionToken()
 
 llvm::Value *ArrayAccessNode::codegen(std::unique_ptr<Context> &context)
 {
-    const llvm::Value *V = context->NamedAllocations[m_arrayNameToken.lexical()];
 
-
-    if (!V)
-    {
-        for (auto &arg: context->TopLevelFunction->args())
-        {
-            if (arg.getName() == m_arrayNameToken.lexical())
-            {
-                V = context->TopLevelFunction->getArg(arg.getArgNo());
-                break;
-            }
-        }
-    }
-
-    if (!V)
+    if (!context->findValue(m_arrayNameToken.lexical()))
         return LogErrorV("Unknown variable for array access: " + m_arrayNameToken.lexical());
 
     const auto parent = resolveParent(context);
 
-    const auto arrayDef = context->ProgramUnit->getVariableDefinition(m_arrayNameToken.lexical());
+    const auto arrayDef = context->programUnit()->getVariableDefinition(m_arrayNameToken.lexical());
     std::shared_ptr<VariableType> arrayDefType = nullptr;
     if (arrayDef)
     {
@@ -133,16 +119,16 @@ llvm::Value *ArrayAccessNode::codegen(std::unique_ptr<Context> &context)
 
         auto index = m_indexNode->codegen(context);
         constexpr unsigned maxBitWith = 64;
-        const auto targetType = llvm::IntegerType::get(*context->TheContext, maxBitWith);
+        const auto targetType = llvm::IntegerType::get(*context->context(), maxBitWith);
         if (maxBitWith != index->getType()->getIntegerBitWidth())
         {
-            index = context->Builder->CreateIntCast(index, targetType, true, "lhs_cast");
+            index = context->builder()->CreateIntCast(index, targetType, true, "lhs_cast");
         }
         const auto lowValue = fieldAccessType->getLowValue(context);
         const auto highValue = fieldAccessType->generateHighValue(m_arrayNameToken, context);
-        const auto compareSmaller = context->Builder->CreateICmpSLE(index, highValue);
-        const auto compareGreater = context->Builder->CreateICmpSGE(index, lowValue);
-        const auto andNode = context->Builder->CreateAnd(compareGreater, compareSmaller);
+        const auto compareSmaller = context->builder()->CreateICmpSLE(index, highValue);
+        const auto compareGreater = context->builder()->CreateICmpSGE(index, lowValue);
+        const auto andNode = context->builder()->CreateAnd(compareGreater, compareSmaller);
         const std::string message = "index out of range for expression: " + token.lexical();
         SystemFunctionCallNode::codegen_assert(context, resolveParent(context), this, andNode, message);
 

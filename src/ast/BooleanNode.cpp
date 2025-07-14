@@ -17,9 +17,9 @@ void BooleanNode::print()
 llvm::Value *BooleanNode::codegen(std::unique_ptr<Context> &context)
 {
     if (m_value)
-        return context->Builder->getTrue();
+        return context->builder()->getTrue();
 
-    return context->Builder->getFalse();
+    return context->builder()->getFalse();
 }
 
 std::shared_ptr<VariableType> BooleanNode::resolveType(const std::unique_ptr<UnitNode> &unit, ASTNode *parentNode)
